@@ -44,11 +44,11 @@ server.ready(err => {
     console.log('A user connected');
 
     // Listen for "chat-message" event from client
-    socket.on("chat-message", () => {
-      console.log("Received chat-message event from client");
+    socket.on('chat-message', () => {
+      console.log('Received chat-message event from client');
 
       // Emit the "secret" message back to the client
-      socket.emit("test", "This is the test message!");
+      socket.broadcast.emit('test', 'This is the test message!');
     });
 
     // Handle socket disconnection
