@@ -1,18 +1,68 @@
-// Import the framework and instantiate it
-import Fastify from 'fastify'
-const fastify = Fastify({
+import cors from '@fastify/cors';
+import Fastify from 'fastify';
+import fastifyIO from 'fastify-socket.io';
+
+
+const server = Fastify({
   logger: true
-})
+});
 
-// Declare a route
-fastify.get('/', async function handler () {
-  return { hello: 'world' }
-})
+// Register CORS 
+await server.register(cors, {
+  origin: ['http://localhost:5173'],  // Vite-React app's origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+});
 
-// Run the server!
+// Register the Fastify-socket.io 
+await server.register(fastifyIO, {
+  // This is the correct way to add the `cors` option
+  cors: {
+    origin: ['http://localhost:5173'],  // Allow the Vite-React app's origin
+    methods: ['GET', 'POST'],
+  }
+});
+
+// Default "/" Path
+server.get('/', async () => {
+  return { message: 'Chat server is running' };
+});
+
+
+// Set up the socket event listeners
+server.ready(err => {
+  if (err) throw err;
+
+  /*
+  * "io" => represents the Socket.IO server instance; 
+  *   - server.io.on => WebSocket connections and communication between clients and the server;
+  * 
+  * socket.on => no real-time Websocket connection from Socket.IO rather just fastify own events
+  */
+  server.io.on('connection', (socket) => {
+    console.log('A user connected');
+
+    // Listen for "chat-message" event from client
+    socket.on("chat-message", () => {
+      console.log("Received chat-message event from client");
+
+      // Emit the "secret" message back to the client
+      socket.emit("test", "This is the test message!");
+    });
+
+    // Handle socket disconnection
+    socket.on('disconnect', () => {
+      console.log('A user disconnected');
+    });
+  });
+});
+
+
+// Start the server
 try {
-  await fastify.listen({ port: 3000 })
+  await server.listen({port: 3000});
 } catch (err) {
-  fastify.log.error(err)
-  process.exit(1)
+  server.log.error(err);
+  process.exit(1);
 }
