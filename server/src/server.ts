@@ -28,6 +28,8 @@ server.get('/', async () => {
   return { message: 'Chat server is running' };
 });
 
+const userNames = {};
+
 // Set up the socket event listeners
 server.ready((err) => {
   if (err) throw err;
@@ -41,17 +43,27 @@ server.ready((err) => {
   server.io.on('connection', (socket) => {
     console.log('A user connected');
 
+    socket.on('new-user', (name: string) => {
+      userNames[socket.id] = name;
+      socket.broadcast.emit('user-connected', userNames);
+    });
+
     // Listen for "chat-message" event from client
     socket.on('chat-message', (data: string) => {
       console.log('Received chat-message event from client:', data);
 
-      // Emit the "secret" message back to the client
-      socket.broadcast.emit('test', data);
+      // Emit the message back to the client
+      socket.broadcast.emit('serverTransferedMessage', {
+        message: data,
+        userName: userNames[socket.id],
+      });
     });
 
     // Handle socket disconnection
     socket.on('disconnect', () => {
-      console.log('A user disconnected');
+      delete userNames[socket.id]; // Clean up disconnected user
+      socket.broadcast.emit('user-connected', userNames);
+      console.log('User disconnected:', userNames);
     });
   });
 });

@@ -1,36 +1,59 @@
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
 
 const socket = io('http://localhost:3000');
 
+interface UserData {
+  message: string;
+  userName: string;
+  isSelf: boolean;
+}
+
 function App() {
-  const [receivedMessage, setReceivedMessage] = useState<string[]>([]);
+  const [receivedMessage, setReceivedMessage] = useState<UserData[]>([]);
   const [messageInputValue, setMessageInputValue] = useState('');
+  const [userName, setUserName] = useState('');
+  const [currentlyConnectedUsers, setCurrentlyConnectedUsers] = useState<
+    Record<string, string>
+  >({}); // Record -> { socket.id : userName }
+  const hasPrompted = useRef(false);
 
   useEffect(() => {
-    // Listen for the "test" event from the server
-    socket.on('test', (message) => {
-      console.log('Received tesxt message:', message);
-      setReceivedMessage((prevMessages) => [...prevMessages, message]);
+    // Ensures that the promt request is only 1 time after entering once
+    if (!hasPrompted.current) {
+      const inputUserName = prompt('Please enter an username:') || 'Private';
+      setUserName(inputUserName);
+      socket.emit('new-user', inputUserName);
+      hasPrompted.current = true;
+    }
+
+    // Listen for the "serverTransferedMessage" event from the server
+    socket.on(
+      'serverTransferedMessage',
+      (userData: { message: string; userName: string }) => {
+        console.log('Received tesxt message:', userData);
+        setReceivedMessage((prevMessages) => [
+          ...prevMessages,
+          {
+            message: userData.message,
+            userName: userData.userName,
+            isSelf: false,
+          },
+        ]);
+      }
+    );
+
+    // Listen for current user connections
+    socket.on('user-connected', (users: Record<string, string>) => {
+      setCurrentlyConnectedUsers(users);
     });
 
     // Clean up the socket listener when component unmounts
     return () => {
-      socket.off('test');
+      socket.off('serverTransferedMessage');
+      socket.off('user-connected');
     };
   }, []);
-
-  const renderMessageLine = () => {
-    return (
-      <div>
-        <p>
-          {receivedMessage.map((message, index) => (
-            <h3 key={index}>{message}</h3>
-          ))}
-        </p>
-      </div>
-    );
-  };
 
   // Emit the "chat-message" event to the server
   const sendMessage = () => {
@@ -42,25 +65,64 @@ function App() {
       // Saves the received messages to display afterwards
       setReceivedMessage((prevMessages) => [
         ...prevMessages,
-        messageInputValue,
+        { message: messageInputValue, userName: userName, isSelf: true },
       ]);
     }
   };
 
+  const renderMessageLine = () => {
+    return (
+      <div className="space-y-2">
+        {receivedMessage.map((message, index) => (
+          <div
+            key={index}
+            className={`p-2 rounded ${
+              message.isSelf ? 'bg-blue-100 ml-auto' : 'bg-gray-100'
+            } max-w-[100%] inline-block`}
+          >
+            <div className="text-sm font-semibold">
+              <strong>{message.isSelf ? 'You' : message.userName}: </strong>
+              {message.message}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderLastMessage = (): ReactNode => {
+    const lastMessage = receivedMessage[receivedMessage.length - 1];
+    if (!lastMessage) return 'No messages yet';
+    return (
+      <span>
+        <strong>{lastMessage.userName}: </strong> {lastMessage.message}
+      </span>
+    );
+  };
+
   return (
     <div className="App">
-      <h1>Socket.IO React Client</h1>
+      <h1>Real Time Chat (Socket.IO)</h1>
+      <div className="text-sm text-gray-600">Logged in as: {userName}</div>
+      <div>{renderMessageLine()}</div>
       <div className="InputDiv">
-        <div>{renderMessageLine()}</div>
         <input
           type="text"
           placeholder="text-message"
           value={messageInputValue}
           onChange={(e) => setMessageInputValue(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
         />
         <button onClick={sendMessage}>Send Chat Message</button>
       </div>
-      <p>Last Message from Server: {receivedMessage}</p>
+      <p>Last Message : {renderLastMessage()}</p>
+      <div className="space-y-1">
+        {Object.values(currentlyConnectedUsers).map((name, index) => (
+          <div key={index} className="text-sm text-gray-600">
+            • {name}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
