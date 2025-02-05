@@ -17,6 +17,7 @@
     "@fastify/websocket": "^11.0.1",
     "@types/node": "^22.9.0",
     "@types/simple-peer": "^9.11.8",
+    "cors": "^2.8.5",
     "fastify": "^5.1.0",
     "fastify-cors": "^6.0.3",
     "fastify-socket.io": "^5.1.0",

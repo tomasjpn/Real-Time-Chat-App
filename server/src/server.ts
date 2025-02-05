@@ -23,6 +23,8 @@ await server.register(fastifyIO, {
   },
 });
 
+//-----------------------------------------------------------------------------//
+
 // Default "/" Path
 server.get('/', async () => {
   return { message: 'Chat server is running' };
