@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import fastifyIO from 'fastify-socket.io';
+import MAX_USERS_PER_CHAT from '../../src/defs/app-def.js';
 
 const server = Fastify({
   logger: true,
@@ -30,7 +31,7 @@ server.get('/', async () => {
   return { message: 'Chat server is running' };
 });
 
-const userNames = {};
+const connectedUsers: Record<string, string> = {};
 
 // Set up the socket event listeners
 server.ready((err) => {
@@ -42,30 +43,43 @@ server.ready((err) => {
    *
    * socket.on => no real-time Websocket connection from Socket.IO rather just fastify own events
    */
+
+  server.io.use((socket, next) => {
+    const currentUserCount = Object.keys(connectedUsers).length;
+
+    if (currentUserCount >= MAX_USERS_PER_CHAT) {
+      const error = new Error('Chat room is full');
+      error.name = 'UserLimitError';
+      return next(error);
+    }
+    next();
+  });
   server.io.on('connection', (socket) => {
     console.log('A user connected');
 
-    socket.on('new-user', (name: string) => {
-      userNames[socket.id] = name;
-      socket.broadcast.emit('user-connected', userNames);
+    socket.on('new-user', (userName: string) => {
+      connectedUsers[socket.id] = userName;
+
+      // Broadcast updated user list
+      server.io.emit('user-connected', connectedUsers);
     });
 
     // Listen for "chat-message" event from client
-    socket.on('chat-message', (data: string) => {
-      console.log('Received chat-message event from client:', data);
+    socket.on('chat-message', (message: string) => {
+      console.log('Received chat-message event from client:', message);
 
       // Emit the message back to the client
       socket.broadcast.emit('serverTransferedMessage', {
-        message: data,
-        userName: userNames[socket.id],
+        message,
+        userName: connectedUsers[socket.id],
       });
     });
 
     // Handle socket disconnection
     socket.on('disconnect', () => {
-      delete userNames[socket.id]; // Clean up disconnected user
-      socket.broadcast.emit('user-connected', userNames);
-      console.log('User disconnected:', userNames);
+      delete connectedUsers[socket.id]; // Clean up disconnected user
+      socket.broadcast.emit('user-connected', connectedUsers);
+      console.log('User disconnected:', connectedUsers);
     });
   });
 });
