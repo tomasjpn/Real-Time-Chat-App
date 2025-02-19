@@ -13,6 +13,12 @@ const FullScreenGrid = styled(Grid2)(({ theme }) => ({
   padding: theme.spacing(2),
   boxSizing: 'border-box',
   overflow: 'hidden',
+  borderRadius: '5vw',
+  '& > h1': {
+    gridColumn: 'span 3',
+    margin: 0,
+    alignSelf: 'start',
+  },
 }));
 
 const StyledDiv = styled('div')({

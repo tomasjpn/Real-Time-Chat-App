@@ -1,9 +1,16 @@
-import { Grid2 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
 const MainGrid = styled('div')(({ theme }) => ({
   background: 'rgba(255, 255, 255, 0.07)',
+  gridColumn: 'span 9',
   width: '100%',
+  height: '100%',
+  display: 'grid',
+  gridTemplateRows: '1fr auto',
+  gap: theme.spacing(2),
+  padding: theme.spacing(2),
+  boxSizing: 'border-box',
+  borderRadius: theme.spacing(2),
 }));
 
 const StyledDiv = styled('div')({
