@@ -23,6 +23,9 @@ a:hover {
 }
 
 body {
+  max-width: 1920px;
+  max-height: 1080px;
+  overflow: hidden;
   margin: 0;
   display: flex;
   place-items: center;

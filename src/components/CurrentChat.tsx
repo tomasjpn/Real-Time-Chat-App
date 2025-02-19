@@ -1,5 +1,11 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
+import {
+  InputDiv,
+  InputElm,
+  MainGrid,
+  SendMsgBtn,
+} from '../styles/components/CurrentChat';
 
 interface UserData {
   message: string;
@@ -118,26 +124,26 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   }
 
   return (
-    <div>
+    <MainGrid>
       <div>Logged in as: {userName}</div>
       <div>{renderMessageLine()}</div>
-      <div className="InputDiv">
-        <input
-          type="text"
-          placeholder="text-message"
-          value={messageInputValue}
-          onChange={(e) => setMessageInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-        />
-        <button onClick={sendMessage}>Send Chat Message</button>
-      </div>
       <p>Last Message : {renderLastMessage()}</p>
       <div>
         {Object.values(currentlyConnectedUsers).map((name, index) => (
           <div key={index}>• {name}</div>
         ))}
       </div>
-    </div>
+      <InputDiv>
+        <InputElm
+          type="text"
+          placeholder="text-message"
+          value={messageInputValue}
+          onChange={(e) => setMessageInputValue(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+        />
+        <SendMsgBtn onClick={sendMessage}>Send Chat Message</SendMsgBtn>
+      </InputDiv>
+    </MainGrid>
   );
 };
 

@@ -1,6 +1,6 @@
 // App.tsx
 import { useState, useRef, useEffect } from 'react';
-import { AppMainGrid } from '../src/styles/components/App';
+import { FullScreenGrid } from '../src/styles/components/App';
 import CurrentChat from './components/CurrentChat';
 
 function App() {
@@ -17,10 +17,10 @@ function App() {
   }, []);
 
   return (
-    <AppMainGrid className="App">
+    <FullScreenGrid>
       <h1>Real Time Chat (Socket.IO)</h1>
       <CurrentChat userName={userName} />
-    </AppMainGrid>
+    </FullScreenGrid>
   );
 }
 
