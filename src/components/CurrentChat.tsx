@@ -88,15 +88,10 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
 
   const renderMessageLine = () => {
     return (
-      <div className="space-y-2">
+      <div>
         {receivedMessage.map((message, index) => (
-          <div
-            key={index}
-            className={`p-2 rounded ${
-              message.isSelf ? 'bg-blue-100 ml-auto' : 'bg-gray-100'
-            } max-w-[100%] inline-block`}
-          >
-            <div className="text-sm font-semibold">
+          <div key={index}>
+            <div>
               <strong>{message.isSelf ? 'You' : message.userName}: </strong>
               {message.message}
             </div>
@@ -124,7 +119,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
 
   return (
     <div>
-      <div className="text-sm text-gray-600">Logged in as: {userName}</div>
+      <div>Logged in as: {userName}</div>
       <div>{renderMessageLine()}</div>
       <div className="InputDiv">
         <input
@@ -137,11 +132,9 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
         <button onClick={sendMessage}>Send Chat Message</button>
       </div>
       <p>Last Message : {renderLastMessage()}</p>
-      <div className="space-y-1">
+      <div>
         {Object.values(currentlyConnectedUsers).map((name, index) => (
-          <div key={index} className="text-sm text-gray-600">
-            • {name}
-          </div>
+          <div key={index}>• {name}</div>
         ))}
       </div>
     </div>
