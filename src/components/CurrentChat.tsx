@@ -97,7 +97,12 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       <div>
         {receivedMessage.map((message, index) => (
           <div key={index}>
-            <div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: message.isSelf ? 'flex-end' : 'flex-start',
+              }}
+            >
               <strong>{message.isSelf ? 'You' : message.userName}: </strong>
               {message.message}
             </div>
