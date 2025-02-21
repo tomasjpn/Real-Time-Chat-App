@@ -54,32 +54,39 @@ server.ready((err) => {
     }
     next();
   });
+
   server.io.on('connection', (socket) => {
-    console.log('A user connected');
+    console.log('A user connected:', socket.id);
 
     socket.on('new-user', (userName: string) => {
       connectedUsers[socket.id] = userName;
-
-      // Broadcast updated user list
-      server.io.emit('user-connected', connectedUsers);
+      // Send the user their own socket ID and the current user list
+      socket.emit('self-id', socket.id);
+      server.io.emit('user-list', connectedUsers);
     });
 
-    // Listen for "chat-message" event from client
-    socket.on('chat-message', (message: string) => {
-      console.log('Received chat-message event from client:', message);
+    socket.on(
+      'private-message',
+      ({ targetId, message }: { targetId: string; message: string }) => {
+        const senderName = connectedUsers[socket.id];
+        console.log(
+          `Private message from ${senderName} to ${targetId}: ${message}`
+        );
 
-      // Emit the message back to the client
-      socket.broadcast.emit('serverTransferedMessage', {
-        message,
-        userName: connectedUsers[socket.id],
-      });
-    });
-
+        // Send to specific socket ID
+        server.io.to(targetId).emit('receive-private-message', {
+          senderId: socket.id,
+          senderName: senderName,
+          message: message,
+        });
+      }
+    );
     // Handle socket disconnection
     socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
       delete connectedUsers[socket.id]; // Clean up disconnected user
-      socket.broadcast.emit('user-connected', connectedUsers);
       console.log('User disconnected:', connectedUsers);
+      server.io.emit('user-list', connectedUsers);
     });
   });
 });

@@ -1,15 +1,26 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import {
+  MainGrid,
+  UserInfoBar,
+  ChatContainer,
+  UserListContainer,
+  UserItem,
+  ChatAreaContainer,
+  MessageContainer,
+  MessageWrapper,
+  MessageBubble,
+  SenderName,
+  PlaceholderText,
   InputDiv,
   InputElm,
-  MainGrid,
   SendMsgBtn,
 } from '../styles/components/CurrentChat';
 
-interface UserData {
+interface Message {
+  senderId: string;
+  senderName: string;
   message: string;
-  userName: string;
   isSelf: boolean;
 }
 
@@ -18,14 +29,18 @@ interface CurrentChatProps {
 }
 
 const CurrentChat = ({ userName }: CurrentChatProps) => {
-  const [receivedMessage, setReceivedMessage] = useState<UserData[]>([]);
   const [messageInputValue, setMessageInputValue] = useState('');
   const [connectionError, setConnectionError] = useState(false);
-  const [currentlyConnectedUsers, setCurrentlyConnectedUsers] = useState<
-    Record<string, string>
-  >({}); // Record -> { socket.id : userName }
+  const [connectedUsers, setConnectedUsers] = useState<Record<string, string>>(
+    {}
+  ); // Record -> { socket.id : userName }
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [selfId, setSelfId] = useState<string>('');
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const socketRef = useRef<Socket | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // Setup socket connection - only once when component mounts
   useEffect(() => {
     const socket = io('http://localhost:3000', {
       reconnection: false,
@@ -41,85 +56,80 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       setConnectionError(true);
       socket.disconnect();
     });
-
     // Successful connection
     socket.on('connect', () => {
+      console.log('Connected to server');
       socket.emit('new-user', userName);
     });
 
-    // Listen for the "serverTransferedMessage" event from the server
+    socket.on('self-id', (id: string) => {
+      console.log('Received self ID:', id);
+      setSelfId(id);
+    });
+
+    socket.on('user-list', (users: Record<string, string>) => {
+      console.log('Received user list:', users);
+      setConnectedUsers(users);
+    });
+
     socket.on(
-      'serverTransferedMessage',
-      (userData: { message: string; userName: string }) => {
-        console.log('Received text message:', userData);
-        setReceivedMessage((prevMessages) => [
-          ...prevMessages,
+      'receive-private-message',
+      (data: { senderId: string; senderName: string; message: string }) => {
+        console.log('Received private message:', data);
+        // Add message if it's from the currently selected user or if no user is selected
+        setChatMessages((prev) => [
+          ...prev,
           {
-            message: userData.message,
-            userName: userData.userName,
+            ...data,
             isSelf: false,
           },
         ]);
       }
     );
 
-    // Listen for current user connections
-    socket.on('user-connected', (users: Record<string, string>) => {
-      setCurrentlyConnectedUsers(users);
-    });
-
-    // Clean up the socket listener when component unmounts
     return () => {
       socket.disconnect();
     };
-  }, [userName]); // Empty dependency array to run only once
+  }, [userName]); // Only depend on userName
 
-  // Emit the "chat-message" event to the server
-  const sendMessage = () => {
-    const socket = socketRef.current;
-    if (socket && messageInputValue.trim()) {
-      // Emits the message to the server
-      socket.emit('chat-message', messageInputValue);
-
-      // Saves the received messages to display afterwards
-      setReceivedMessage((prevMessages) => [
-        ...prevMessages,
-        { message: messageInputValue, userName: userName, isSelf: true },
-      ]);
-
-      // Reset the Input Field
-      setMessageInputValue('');
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
     }
+  }, [chatMessages]);
+
+  const sendMessage = () => {
+    if (!socketRef.current || !selectedUser || !messageInputValue.trim())
+      return;
+
+    const messageData = {
+      targetId: selectedUser,
+      message: messageInputValue.trim(),
+    };
+
+    socketRef.current.emit('private-message', messageData);
+
+    // Add message to local state
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        senderId: selfId,
+        senderName: userName,
+        message: messageInputValue.trim(),
+        isSelf: true,
+      },
+    ]);
+    // Reset the Input Field
+    setMessageInputValue('');
   };
 
-  const renderMessageLine = () => {
-    return (
-      <div>
-        {receivedMessage.map((message, index) => (
-          <div key={index}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: message.isSelf ? 'flex-end' : 'flex-start',
-              }}
-            >
-              <strong>{message.isSelf ? 'You' : message.userName}: </strong>
-              {message.message}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderLastMessage = (): ReactNode => {
-    const lastMessage = receivedMessage[receivedMessage.length - 1];
-    if (!lastMessage) return 'No messages yet';
-    return (
-      <span>
-        <strong>{lastMessage.userName}: </strong> {lastMessage.message}
-      </span>
-    );
+  const selectUser = (userId: string) => {
+    if (userId !== selfId) {
+      setSelectedUser(userId);
+      setChatMessages([]); // Clear messages when switching users
+    }
   };
 
   if (connectionError) {
@@ -130,24 +140,73 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
 
   return (
     <MainGrid>
-      <div>Logged in as: {userName}</div>
-      <div>{renderMessageLine()}</div>
-      <p>Last Message : {renderLastMessage()}</p>
-      <div>
-        {Object.values(currentlyConnectedUsers).map((name, index) => (
-          <div key={index}>• {name}</div>
-        ))}
-      </div>
-      <InputDiv>
-        <InputElm
-          type="text"
-          placeholder="text-message"
-          value={messageInputValue}
-          onChange={(e) => setMessageInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-        />
-        <SendMsgBtn onClick={sendMessage}>Send Chat Message</SendMsgBtn>
-      </InputDiv>
+      <UserInfoBar>
+        Logged in as: {userName} (Your ID: {selfId})
+      </UserInfoBar>
+
+      <ChatContainer>
+        {/* User List */}
+        <UserListContainer>
+          <h3>Select User to Chat</h3>
+          {Object.entries(connectedUsers).map(
+            ([id, name]) =>
+              id !== selfId && (
+                <UserItem
+                  key={id}
+                  onClick={() => selectUser(id)}
+                  isSelected={selectedUser === id}
+                >
+                  {name} {selectedUser === id ? '(Selected)' : ''}
+                </UserItem>
+              )
+          )}
+        </UserListContainer>
+
+        {/* Chat Area */}
+        <ChatAreaContainer>
+          <MessageContainer ref={chatContainerRef}>
+            {selectedUser ? (
+              chatMessages.length > 0 ? (
+                chatMessages.map((msg, index) => (
+                  <MessageWrapper key={index} isSelf={msg.isSelf}>
+                    <MessageBubble isSelf={msg.isSelf}>
+                      <SenderName>
+                        {msg.isSelf ? 'You' : msg.senderName}
+                      </SenderName>
+                      {msg.message}
+                    </MessageBubble>
+                  </MessageWrapper>
+                ))
+              ) : (
+                <PlaceholderText>
+                  Start your conversation with {connectedUsers[selectedUser]}
+                </PlaceholderText>
+              )
+            ) : (
+              <PlaceholderText>Select a user to start chatting</PlaceholderText>
+            )}
+          </MessageContainer>
+
+          <InputDiv>
+            <InputElm
+              type="text"
+              placeholder={
+                selectedUser ? 'Type your message...' : 'Select a user first'
+              }
+              value={messageInputValue}
+              onChange={(e) => setMessageInputValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              disabled={!selectedUser}
+            />
+            <SendMsgBtn
+              onClick={sendMessage}
+              disabled={!selectedUser || !messageInputValue.trim()}
+            >
+              Send
+            </SendMsgBtn>
+          </InputDiv>
+        </ChatAreaContainer>
+      </ChatContainer>
     </MainGrid>
   );
 };
