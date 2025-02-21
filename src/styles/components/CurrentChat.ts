@@ -28,7 +28,7 @@ const UserListContainer = styled('div')(({ theme }) => ({
   width: '20vw',
   padding: theme.spacing(2),
   backgroundColor: 'rgba(245, 245, 245, 0.07)',
-  borderRadius: '0.5vw',
+  borderRadius: theme.spacing(1.2),
   overflowY: 'auto',
 }));
 
@@ -54,7 +54,8 @@ const MessageContainer = styled('div')(({ theme }) => ({
   overflowY: 'auto',
   padding: theme.spacing(2),
   backgroundColor: 'rgba(255, 255, 255, 0.07)',
-  borderRadius: '0.5vw',
+  borderRadius: theme.spacing(1),
+  marginBottom: theme.spacing(2),
 }));
 
 const MessageWrapper = styled('div')<{ isSelf: boolean }>(({ isSelf }) => ({
@@ -87,7 +88,7 @@ const PlaceholderText = styled('div')({
 const InputDiv = styled('div')(({ theme }) => ({
   display: 'flex',
   gap: theme.spacing(2),
-  minWidth: '40vw',
+  minWidth: '35vw',
   background: 'rgba(255, 255, 255, 0.07)',
   padding: theme.spacing(4),
   borderRadius: '1vw',
