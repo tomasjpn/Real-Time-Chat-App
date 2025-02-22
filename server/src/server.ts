@@ -1,7 +1,6 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import fastifyIO from 'fastify-socket.io';
-import MAX_USERS_PER_CHAT from '../../src/defs/app-def.js';
 
 const server = Fastify({
   logger: true,
@@ -43,17 +42,6 @@ server.ready((err) => {
    *
    * socket.on => no real-time Websocket connection from Socket.IO rather just fastify own events
    */
-
-  server.io.use((socket, next) => {
-    const currentUserCount = Object.keys(connectedUsers).length;
-
-    if (currentUserCount >= MAX_USERS_PER_CHAT) {
-      const error = new Error('Chat room is full');
-      error.name = 'UserLimitError';
-      return next(error);
-    }
-    next();
-  });
 
   server.io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
