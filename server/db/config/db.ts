@@ -25,8 +25,35 @@ export async function initializeDatabase() {
       CREATE TABLE users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        chatrooms TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // Create the chatrooms table
+    await db.execute(sql`
+      CREATE TABLE chatrooms (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Junction table (join table) many -> many  relation
+    await db.execute(sql`
+      CREATE TABLE user_chatrooms (
+       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+       chatroom_id INTEGER REFERENCES chartooms(id) ON DELETE CASCADE,
+       PRIMARY KEY (user_id, chatroom_id)
+      );
+    `);
+
+    // Create the messages table
+    await db.execute(sql`
+      CREATE TABLE messages (
+       id SERIAL PRIMARY KEY,
+       chatroom_id INTEGER REFERENCES chatrooms(id) ON DELTE CASCADE,
+       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+       content TEXT NOT NULL,
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
