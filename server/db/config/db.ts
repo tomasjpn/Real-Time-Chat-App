@@ -41,7 +41,7 @@ export async function initializeDatabase() {
     await db.execute(sql`
       CREATE TABLE user_chatrooms (
        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-       chatroom_id INTEGER REFERENCES chartooms(id) ON DELETE CASCADE,
+       chatroom_id INTEGER REFERENCES chatrooms(id) ON DELETE CASCADE,
        PRIMARY KEY (user_id, chatroom_id)
       );
     `);
@@ -50,7 +50,7 @@ export async function initializeDatabase() {
     await db.execute(sql`
       CREATE TABLE messages (
        id SERIAL PRIMARY KEY,
-       chatroom_id INTEGER REFERENCES chatrooms(id) ON DELTE CASCADE,
+       chatroom_id INTEGER REFERENCES chatrooms(id) ON DELETE CASCADE,
        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
        content TEXT NOT NULL,
        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
