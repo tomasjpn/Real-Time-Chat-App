@@ -22,7 +22,7 @@ export async function initializeDatabase() {
   try {
     // Create the users table
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         chatrooms TEXT NOT NULL UNIQUE,

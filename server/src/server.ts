@@ -73,11 +73,37 @@ async function startServer() {
       server.io.on('connection', (socket) => {
         console.log('A user connected:', socket.id);
 
-        socket.on('new-user', (userName: string) => {
+        socket.on('new-user', async (userName: string) => {
+          const client = await server.pg.connect();
           connectedUsers[socket.id] = userName;
-          // Send the user their own socket ID and the current user list
-          socket.emit('self-id', socket.id);
-          server.io.emit('user-list', connectedUsers);
+
+          try {
+            const tableInfoQuery = await client.query(`
+              SELECT column_name 
+              FROM information_schema.columns 
+              WHERE table_name = 'users'
+            `);
+
+            console.log(
+              'Available columns:',
+              tableInfoQuery.rows.map((row) => row.column_name)
+            );
+
+            // Generate a unique chatroom identifier for the user
+            const chatroom = `room_${socket.id}`;
+
+            // Insert the user into the database using the correct columns
+            const { rows } = await client.query(
+              'INSERT INTO users (name, chatrooms) VALUES ($1, $2) RETURNING *',
+              [userName, chatroom]
+            );
+            // Send the user their own socket ID and the current user list
+            socket.emit('self-id', socket.id);
+            server.io.emit('user-list', connectedUsers);
+            return rows;
+          } finally {
+            client.release();
+          }
         });
 
         socket.on(
