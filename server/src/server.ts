@@ -4,6 +4,7 @@ import fastifyIO from 'fastify-socket.io';
 import fastifyPostgres from '@fastify/postgres';
 import { db, initializeDatabase } from '../db/config/db.js';
 import { sql } from 'drizzle-orm';
+import { CONFIG } from '../db/config/config.js';
 
 const server = Fastify({
   logger: true,
@@ -19,8 +20,7 @@ async function startServer() {
 
     // Register PostgreSQL
     await server.register(fastifyPostgres, {
-      connectionString:
-        'postgres://postgres:1234@localhost:5432/real_time_chat_app',
+      connectionString: CONFIG.db.connectionString,
     });
 
     // Register CORS

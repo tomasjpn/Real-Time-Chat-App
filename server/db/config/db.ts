@@ -1,16 +1,17 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pkg from 'pg';
 import { sql } from 'drizzle-orm';
+import { CONFIG } from './config.js';
 
 const { Pool } = pkg;
 
 // Create a PostgreSQL connection pool
 export const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  user: 'postgres',
-  password: '1234',
-  database: 'real_time_chat_app',
+  host: CONFIG.server.host,
+  port: Number(CONFIG.server.port),
+  user: CONFIG.server.user,
+  password: CONFIG.server.password,
+  database: CONFIG.server.database,
 });
 
 export const db = drizzle(pool);
