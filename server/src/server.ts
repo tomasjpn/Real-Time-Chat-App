@@ -5,6 +5,7 @@ import fastifyPostgres from '@fastify/postgres';
 import { db, initializeDatabase } from '../db/config/db.js';
 import { sql } from 'drizzle-orm';
 import { CONFIG } from '../db/config/config.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const server = Fastify({
   logger: true,
@@ -33,9 +34,8 @@ async function startServer() {
 
     // Register the Fastify-socket.io
     await server.register(fastifyIO, {
-      // This is the correct way to add the `cors` option
       cors: {
-        origin: ['http://localhost:5173'], // Allow the Vite-React app's origin
+        origin: ['http://localhost:5173'],
         methods: ['GET', 'POST'],
       },
     });
@@ -58,7 +58,22 @@ async function startServer() {
       return { message: 'Chat server is running' };
     });
 
-    const connectedUsers: Record<string, string> = {};
+    //-----------------------------------------------------------------------------//
+
+    // Map to track connected users with their UUID and socket info
+    const connectedUsers: Record<
+      string,
+      {
+        socketId: string;
+        userName: string;
+        dbUserId?: number;
+      }
+    > = {};
+
+    // Reverse mapping for quick lookup: { socketId: uuid }
+    const socketToUuid: Record<string, string> = {};
+
+    //-----------------------------------------------------------------------------//
 
     // Set up the socket event listeners
     server.ready((err) => {
@@ -75,8 +90,6 @@ async function startServer() {
         console.log('A user connected:', socket.id);
 
         socket.on('new-user', async (userName: string) => {
-          connectedUsers[socket.id] = userName;
-
           try {
             const tableInfoQuery = await db.execute(`
               SELECT column_name 
@@ -89,40 +102,42 @@ async function startServer() {
               tableInfoQuery.rows.map((row) => row.column_name)
             );
 
+            // Generate UUID for the user
+            const userUuid = uuidv4();
+
             // Insert the user into the database
             const userResult = await db.execute(sql`
-              INSERT INTO users (name) VALUES (${userName}) RETURNING *
+              INSERT INTO users (uuid, name) VALUES (${userUuid}, ${userName}) RETURNING *
             `);
             console.log('User insert result:', userResult);
 
-            // extract UserID
-            let userId;
-            if (Array.isArray(userResult) && userResult.length > 0) {
-              // If it's an array of rows
-              userId = userResult[0].id;
-            } else if (userResult.rows && userResult.rows.length > 0) {
-              // If it's a pg-style result object
-              userId = userResult.rows[0].id;
-            } else {
-              throw new Error('Could not retrieve user ID from insert result');
-            }
+            // Extract user data from the result
+            const insertedUser = Array.isArray(userResult)
+              ? userResult[0]
+              : userResult.rows[0];
+            const userId = insertedUser.id;
+            const dbUserUuid = insertedUser.uuid;
+
+            // Store user information in memory
+            connectedUsers[dbUserUuid] = {
+              socketId: socket.id,
+              userName: userName,
+              dbUserId: userId,
+            };
+
+            // Reverse mapping from socket to UUID
+            socketToUuid[socket.id] = dbUserUuid;
 
             // Insert the chatroom
             const chatroomResult = await db.execute(sql`
-              INSERT INTO chatrooms (name) VALUES (${`room_${socket.id}`}) RETURNING *
+              INSERT INTO chatrooms (name) VALUES (${`room_${dbUserUuid}`}) RETURNING *
             `);
             console.log('Chatroom insert result:', chatroomResult);
 
-            let chatroomId;
-            if (Array.isArray(chatroomResult) && chatroomResult.length > 0) {
-              chatroomId = chatroomResult[0].id;
-            } else if (chatroomResult.rows && chatroomResult.rows.length > 0) {
-              chatroomId = chatroomResult.rows[0].id;
-            } else {
-              throw new Error(
-                'Could not retrieve chatroom ID from insert result'
-              );
-            }
+            const insertedChatroom = Array.isArray(chatroomResult)
+              ? chatroomResult[0]
+              : chatroomResult.rows[0];
+            const chatroomId = insertedChatroom.id;
 
             // Link the user to the chatroom
             await db.execute(sql`
@@ -130,9 +145,19 @@ async function startServer() {
               VALUES (${userId}, ${chatroomId})
             `);
 
-            // Send the user their own socket ID and the current user list
-            socket.emit('self-id', socket.id);
-            server.io.emit('user-list', connectedUsers);
+            // Send the user their own UUID and the current user list
+            socket.emit('self-id', dbUserUuid);
+
+            // Transform the user list to send to clients
+            const userListForClients = Object.entries(connectedUsers).reduce(
+              (acc, [uuid, data]) => {
+                acc[uuid] = data.userName;
+                return acc;
+              },
+              {} as Record<string, string>
+            );
+
+            server.io.emit('user-list', userListForClients);
           } catch (error) {
             console.error('Error creating new user:', error);
           }
@@ -147,30 +172,34 @@ async function startServer() {
             targetId: string;
             message: string;
           }) => {
-            const senderName = connectedUsers[socket.id];
+            // Get sender's UUID from socketId
+            const senderUuid = socketToUuid[socket.id];
+            if (!senderUuid || !connectedUsers[senderUuid]) {
+              console.log('Unknown sender, message discarded');
+              return;
+            }
+
+            const senderName = connectedUsers[senderUuid].userName;
             console.log(
-              `Private message from ${senderName} to ${targetId}: ${message}`
+              `Private message from ${senderName} (${senderUuid}) to ${targetId}: ${message}`
             );
 
+            if (!connectedUsers[targetId]) {
+              console.log('Target user not found:', targetId);
+              return;
+            }
+
+            const targetSocketId = connectedUsers[targetId].socketId;
+
             try {
-              // Find the user ID from the name
-              const usersResult = await db.execute(sql`
-                SELECT id FROM users WHERE name = ${senderName} LIMIT 1
-              `);
-              console.log('User select result:', usersResult);
+              const userId = connectedUsers[senderUuid].dbUserId;
 
-              let userId;
-              if (Array.isArray(usersResult) && usersResult.length > 0) {
-                userId = usersResult[0].id;
-              } else if (usersResult.rows && usersResult.rows.length > 0) {
-                userId = usersResult.rows[0].id;
-              } else {
+              if (!userId) {
                 console.log(
-                  'User not found in database, sending message without saving to DB'
+                  'User ID not found in memory, sending message without saving to DB'
                 );
-
-                server.io.to(targetId).emit('receive-private-message', {
-                  senderId: socket.id,
+                server.io.to(targetSocketId).emit('receive-private-message', {
+                  senderId: senderUuid,
                   senderName: senderName,
                   message: message,
                 });
@@ -184,29 +213,23 @@ async function startServer() {
 
               console.log('User chatrooms result:', userChatroomsResult);
 
-              let chatroomId;
-              if (
-                Array.isArray(userChatroomsResult) &&
-                userChatroomsResult.length > 0
-              ) {
-                chatroomId = userChatroomsResult[0].chatroom_id;
-              } else if (
-                userChatroomsResult.rows &&
-                userChatroomsResult.rows.length > 0
-              ) {
-                chatroomId = userChatroomsResult.rows[0].chatroom_id;
-              } else {
+              const chatroomResult = Array.isArray(userChatroomsResult)
+                ? userChatroomsResult[0]
+                : userChatroomsResult.rows[0];
+
+              if (!chatroomResult) {
                 console.log(
                   'Chatroom not found, sending message without saving to DB'
                 );
 
-                server.io.to(targetId).emit('receive-private-message', {
-                  senderId: socket.id,
+                server.io.to(targetSocketId).emit('receive-private-message', {
+                  senderId: senderUuid,
                   senderName: senderName,
                   message: message,
                 });
                 return;
               }
+              const chatroomId = chatroomResult.chatroom_id;
 
               // Insert the message
               await db.execute(sql`
@@ -214,15 +237,16 @@ async function startServer() {
                 VALUES (${chatroomId}, ${userId}, ${message})
               `);
 
-              server.io.to(targetId).emit('receive-private-message', {
-                senderId: socket.id,
+              server.io.to(targetSocketId).emit('receive-private-message', {
+                senderId: senderUuid,
                 senderName: senderName,
                 message: message,
               });
             } catch (error) {
               console.error('Error sending private message:', error);
-              server.io.to(targetId).emit('receive-private-message', {
-                senderId: socket.id,
+              // Send message even if DB operation fails
+              server.io.to(targetSocketId).emit('receive-private-message', {
+                senderId: senderUuid,
                 senderName: senderName,
                 message: message,
               });
@@ -232,15 +256,28 @@ async function startServer() {
         // Handle socket disconnection
         socket.on('disconnect', () => {
           console.log('User disconnected:', socket.id);
-          delete connectedUsers[socket.id]; // Clean up disconnected user
-          console.log('User disconnected:', connectedUsers);
-          server.io.emit('user-list', connectedUsers);
+          // Find and remove user by socket ID
+          const userUuid = socketToUuid[socket.id];
+          if (userUuid) {
+            delete connectedUsers[userUuid];
+            delete socketToUuid[socket.id];
+
+            // Transform the user list to send to clients
+            const userListForClients = Object.entries(connectedUsers).reduce(
+              (acc, [uuid, data]) => {
+                acc[uuid] = data.userName;
+                return acc;
+              },
+              {} as Record<string, string>
+            );
+
+            server.io.emit('user-list', userListForClients);
+          }
         });
       });
     });
 
     // Start the server
-
     await server.listen({ port: 3000 });
   } catch (err) {
     server.log.error(err);

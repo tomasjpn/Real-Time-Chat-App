@@ -21,10 +21,17 @@ export async function initializeDatabase() {
   try {
     console.log('Running migrations...');
 
+    console.log('Dropping existing tables...');
+    await db.execute(sql`DROP TABLE IF EXISTS messages CASCADE;`);
+    await db.execute(sql`DROP TABLE IF EXISTS user_chatrooms CASCADE;`);
+    await db.execute(sql`DROP TABLE IF EXISTS chatrooms CASCADE;`);
+    await db.execute(sql`DROP TABLE IF EXISTS users CASCADE;`);
+
     // Create the users table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
+        uuid UUID NOT NULL UNIQUE,
         name TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
