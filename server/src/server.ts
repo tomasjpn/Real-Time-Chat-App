@@ -73,6 +73,17 @@ async function startServer() {
     // Reverse mapping for quick lookup: { socketId: uuid }
     const socketToUuid: Record<string, string> = {};
 
+    type UserRecord = {
+      id: number;
+      uuid: string;
+      name: string;
+    };
+
+    type ChatroomRecord = {
+      id: number;
+      name: string;
+    };
+
     //-----------------------------------------------------------------------------//
 
     // Set up the socket event listeners
@@ -91,62 +102,82 @@ async function startServer() {
 
         socket.on('new-user', async (userName: string) => {
           try {
-            const tableInfoQuery = await db.execute(`
-              SELECT column_name 
-              FROM information_schema.columns 
-              WHERE table_name = 'users'
+            let userUuid: string;
+            let userId: number;
+
+            const getExistingUserResult = await db.execute(sql`
+              SELECT id, uuid, name FROM users WHERE name = ${userName} LIMIT 1
             `);
 
-            console.log(
-              'Available columns:',
-              tableInfoQuery.rows.map((row) => row.column_name)
-            );
+            const extractedExistingUser =
+              getExistingUserResult.rows &&
+              getExistingUserResult.rows.length > 0
+                ? (getExistingUserResult.rows[0] as UserRecord)
+                : null;
 
-            // Generate UUID for the user
-            const userUuid = uuidv4();
+            if (extractedExistingUser) {
+              console.log('Existing user found:', extractedExistingUser);
+              userUuid = extractedExistingUser.uuid;
+              userId = extractedExistingUser.id;
+            } else {
+              //-----------------------------------------------------------------------------//
 
-            // Insert the user into the database
-            const userResult = await db.execute(sql`
-              INSERT INTO users (uuid, name) VALUES (${userUuid}, ${userName}) RETURNING *
-            `);
-            console.log('User insert result:', userResult);
+              // Generate UUID for the user
+              userUuid = uuidv4();
 
-            // Extract user data from the result
-            const insertedUser = Array.isArray(userResult)
-              ? userResult[0]
-              : userResult.rows[0];
-            const userId = insertedUser.id;
-            const dbUserUuid = insertedUser.uuid;
+              // Insert the user into the database
+              const insertedUserResult = await db.execute(sql`
+                INSERT INTO users (uuid, name) VALUES (${userUuid}, ${userName}) RETURNING *
+              `);
+              console.log('User insert result:', insertedUserResult.rows);
+
+              // Extract user data from the result
+              const extractedInsertedUser = Array.isArray(insertedUserResult)
+                ? (insertedUserResult[0] as UserRecord)
+                : (insertedUserResult.rows[0] as UserRecord);
+
+              userId = extractedInsertedUser.id;
+              userUuid = extractedInsertedUser.uuid;
+
+              //-----------------------------------------------------------------------------//
+
+              // Create a new chatroom for this user
+              const insertedChatroomResult = await db.execute(sql`
+                INSERT INTO chatrooms (name) VALUES (${`room_${userUuid}`}) RETURNING *
+              `);
+              console.log(
+                'Chatroom insert result:',
+                insertedChatroomResult.rows
+              );
+
+              const extractedInsertedChatroom = Array.isArray(
+                insertedChatroomResult
+              )
+                ? (insertedChatroomResult[0] as ChatroomRecord)
+                : (insertedChatroomResult.rows[0] as ChatroomRecord);
+
+              const chatroomId = extractedInsertedChatroom.id;
+
+              //-----------------------------------------------------------------------------//
+
+              await db.execute(sql`
+                INSERT INTO user_chatrooms (user_id, chatroom_id) 
+                VALUES (${userId}, ${chatroomId})
+              `);
+            }
 
             // Store user information in memory
-            connectedUsers[dbUserUuid] = {
+            connectedUsers[userUuid] = {
               socketId: socket.id,
               userName: userName,
               dbUserId: userId,
             };
 
             // Reverse mapping from socket to UUID
-            socketToUuid[socket.id] = dbUserUuid;
-
-            // Insert the chatroom
-            const chatroomResult = await db.execute(sql`
-              INSERT INTO chatrooms (name) VALUES (${`room_${dbUserUuid}`}) RETURNING *
-            `);
-            console.log('Chatroom insert result:', chatroomResult);
-
-            const insertedChatroom = Array.isArray(chatroomResult)
-              ? chatroomResult[0]
-              : chatroomResult.rows[0];
-            const chatroomId = insertedChatroom.id;
-
-            // Link the user to the chatroom
-            await db.execute(sql`
-              INSERT INTO user_chatrooms (user_id, chatroom_id) 
-              VALUES (${userId}, ${chatroomId})
-            `);
+            socketToUuid[socket.id] = userUuid;
 
             // Send the user their own UUID and the current user list
-            socket.emit('self-id', dbUserUuid);
+            socket.emit('self-id', userUuid);
 
             // Transform the user list to send to clients
             const userListForClients = Object.entries(connectedUsers).reduce(
