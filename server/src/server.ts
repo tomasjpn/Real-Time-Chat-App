@@ -58,6 +58,74 @@ async function startServer() {
       return { message: 'Chat server is running' };
     });
 
+    server.get(
+      '/chat-history/:userUuid/:targetUserUuid',
+      async (request, reply) => {
+        try {
+          const { userUuid, targetUserUuid } = request.params as {
+            userUuid: string;
+            targetUserUuid: string;
+          };
+
+          const getUserResult = await db.execute(sql`
+          SELECT id FROM users WHERE uuid = ${userUuid} LIMIT 1
+        `);
+
+          const getTargetUserResult = await db.execute(sql`
+          SELECT id FROM users WHERE uuid = ${targetUserUuid} LIMIT 1
+        `);
+
+          if (!getUserResult.rows.length || !getTargetUserResult.rows.length) {
+            return reply
+              .code(404)
+              .send({ error: 'One or both users not found' });
+          }
+
+          const userId = getUserResult.rows[0].id;
+          const targetUserId = getTargetUserResult.rows[0].id;
+
+          const sharedChatroomsResult = await db.execute(sql`
+          SELECT uc1.chatroom_id 
+          FROM user_chatrooms uc1
+          JOIN user_chatrooms uc2 ON uc1.chatroom_id = uc2.chatroom_id
+          WHERE uc1.user_id = ${userId} AND uc2.user_id = ${targetUserId}
+          LIMIT 1
+        `);
+
+          if (!sharedChatroomsResult.rows.length) {
+            return reply.send({ messages: [] });
+          }
+
+          const extractedChatroomId = sharedChatroomsResult.rows[0].chatroom_id;
+
+          // Get messages from this chatroom with sender information
+          const getMessagesResult = await db.execute(sql`
+            SELECT m.id, m.user_id, m.content, m.created_at, u.name as sender_name, u.uuid as sender_uuid
+            FROM messages m
+            JOIN users u ON m.user_id = u.id
+            WHERE m.chatroom_id = ${extractedChatroomId}
+            ORDER BY m.created_at ASC
+          `);
+
+          // Format messages for client
+          const formattedMessages = getMessagesResult.rows.map((msg) => ({
+            senderId: msg.sender_uuid,
+            senderName: msg.sender_name,
+            message: msg.content,
+            timestamp: msg.created_at,
+            isSelf: msg.sender_uuid === userUuid,
+          }));
+
+          return reply.send({ formattedMessages });
+        } catch (error) {
+          console.error('Error fetching chat history:', error);
+          return reply
+            .code(500)
+            .send({ error: 'Failed to fetch chat history' });
+        }
+      }
+    );
+
     //-----------------------------------------------------------------------------//
 
     // Map to track connected users with their UUID and socket info
@@ -224,8 +292,10 @@ async function startServer() {
 
             try {
               const userId = connectedUsers[senderUuid].dbUserId;
+              const targetUserId = connectedUsers[targetId].dbUserId;
+              let extractedChatroomId;
 
-              if (!userId) {
+              if (!userId || !targetUserId) {
                 console.log(
                   'User ID not found in memory, sending message without saving to DB'
                 );
@@ -237,35 +307,36 @@ async function startServer() {
                 return;
               }
 
-              // Find the chatroom associated with this communication
-              const userChatroomsResult = await db.execute(sql`
-                SELECT chatroom_id FROM user_chatrooms WHERE user_id = ${userId} LIMIT 1
+              const getSharedChatroomsResult = await db.execute(sql`
+                SELECT uc1.chatroom_id 
+                FROM user_chatrooms uc1
+                JOIN user_chatrooms uc2 ON uc1.chatroom_id = uc2.chatroom_id
+                WHERE uc1.user_id = ${userId} AND uc2.user_id = ${targetUserId}
+                LIMIT 1
               `);
 
-              console.log('User chatrooms result:', userChatroomsResult);
+              if (getSharedChatroomsResult.rows.length === 0) {
+                const newChatroomResult = await db.execute(sql`
+                  INSERT INTO chatrooms (name) 
+                  VALUES (${`room_${senderUuid}_${targetId}`}) 
+                  RETURNING id
+                `);
 
-              const chatroomResult = Array.isArray(userChatroomsResult)
-                ? userChatroomsResult[0]
-                : userChatroomsResult.rows[0];
+                extractedChatroomId = newChatroomResult.rows[0].id;
 
-              if (!chatroomResult) {
-                console.log(
-                  'Chatroom not found, sending message without saving to DB'
-                );
-
-                server.io.to(targetSocketId).emit('receive-private-message', {
-                  senderId: senderUuid,
-                  senderName: senderName,
-                  message: message,
-                });
-                return;
+                await db.execute(sql`
+                  INSERT INTO user_chatrooms (user_id, chatroom_id) 
+                  VALUES (${userId}, ${extractedChatroomId}), (${targetUserId}, ${extractedChatroomId})
+                `);
+              } else {
+                extractedChatroomId =
+                  getSharedChatroomsResult.rows[0].chatroom_id;
               }
-              const chatroomId = chatroomResult.chatroom_id;
 
               // Insert the message
               await db.execute(sql`
                 INSERT INTO messages (chatroom_id, user_id, content) 
-                VALUES (${chatroomId}, ${userId}, ${message})
+                VALUES (${extractedChatroomId}, ${userId}, ${message})
               `);
 
               server.io.to(targetSocketId).emit('receive-private-message', {
@@ -284,6 +355,103 @@ async function startServer() {
             }
           }
         );
+
+        socket.on(
+          'fetch-chat-history',
+          async ({ targetId }: { targetId: string }) => {
+            const senderUuid = socketToUuid[socket.id];
+            if (!senderUuid || !connectedUsers[senderUuid]) {
+              console.log('Unknown sender, cannot fetch chat history');
+              return;
+            }
+
+            try {
+              let chatroomId;
+              const getUserResult = await db.execute(sql`
+               SELECT id 
+               FROM users 
+               WHERE uuid = ${senderUuid} 
+               LIMIT 1
+               `);
+
+              const getTargetUserResult = await db.execute(sql`
+               SELECT id 
+               FROM users 
+               WHERE uuid = ${targetId} 
+               LIMIT 1
+               `);
+
+              if (
+                !getUserResult.rows.length ||
+                !getTargetUserResult.rows.length
+              ) {
+                socket.emit('chat-history', {
+                  error: 'One or both users not found',
+                  messages: [],
+                });
+                return;
+              }
+
+              const userId = getUserResult.rows[0].id;
+              const targetUserId = getTargetUserResult.rows[0].id;
+
+              const sharedChatroomsQuery = sql`
+              SELECT uc1.chatroom_id 
+              FROM user_chatrooms uc1
+              JOIN user_chatrooms uc2 ON uc1.chatroom_id = uc2.chatroom_id
+              WHERE uc1.user_id = ${userId} AND uc2.user_id = ${targetUserId}
+              LIMIT 1
+              `;
+
+              const getSharedChatroomsResult =
+                await db.execute(sharedChatroomsQuery);
+
+              if (getSharedChatroomsResult.rows.length === 0) {
+                const newChatroomResult = await db.execute(sql`
+                  INSERT INTO chatrooms (name) 
+                  VALUES (${`room_${senderUuid}_${targetId}`}) 
+                  RETURNING id
+                `);
+
+                chatroomId = newChatroomResult.rows[0].id;
+
+                await db.execute(sql`
+                INSERT INTO user_chatrooms (user_id, chatroom_id) 
+                VALUES (${userId}, ${chatroomId}), (${targetUserId}, ${chatroomId})
+                `);
+                socket.emit('chat-history', { messages: [] });
+                return;
+              } else {
+                chatroomId = getSharedChatroomsResult.rows[0].chatroom_id;
+              }
+
+              const getMessagesResult = await db.execute(sql`
+                SELECT m.id, m.user_id, m.content, m.created_at, u.name as sender_name, u.uuid as sender_uuid
+                FROM messages m
+                JOIN users u ON m.user_id = u.id
+                WHERE m.chatroom_id = ${chatroomId}
+                ORDER BY m.created_at ASC
+              `);
+
+              const formattedMessages = getMessagesResult.rows.map((msg) => ({
+                senderId: msg.sender_uuid,
+                senderName: msg.sender_name,
+                message: msg.content,
+                timestamp: msg.created_at,
+                isSelf: msg.sender_uuid === senderUuid,
+              }));
+
+              socket.emit('chat-history', { messages: formattedMessages });
+            } catch (error) {
+              console.error('Error fetching chat history:', error);
+              socket.emit('chat-history', {
+                error: 'Failed to fetch chat history',
+                messages: [],
+              });
+            }
+          }
+        );
+
         // Handle socket disconnection
         socket.on('disconnect', () => {
           console.log('User disconnected:', socket.id);

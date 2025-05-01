@@ -22,6 +22,7 @@ interface Message {
   senderName: string;
   message: string;
   isSelf: boolean;
+  timestamp?: string;
 }
 
 interface CurrentChatProps {
@@ -37,6 +38,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selfId, setSelfId] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -76,14 +78,28 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       'receive-private-message',
       (data: { senderId: string; senderName: string; message: string }) => {
         console.log('Received private message:', data);
-        // Add message if it's from the currently selected user or if no user is selected
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            ...data,
-            isSelf: false,
-          },
-        ]);
+        if (data.senderId === selectedUser || !selectedUser) {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              ...data,
+              isSelf: false,
+            },
+          ]);
+        }
+      }
+    );
+
+    socket.on(
+      'chat-history',
+      (data: { messages: Message[]; error?: string }) => {
+        console.log('Received chat history:', data);
+        if (data.error) {
+          console.error('Error fetching chat history:', data.error);
+        } else {
+          setChatMessages(data.messages);
+        }
+        setIsLoading(false);
       }
     );
 
@@ -128,7 +144,12 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   const selectUser = (userId: string) => {
     if (userId !== selfId) {
       setSelectedUser(userId);
-      setChatMessages([]); // Clear messages when switching users
+      setChatMessages([]);
+      setIsLoading(true);
+
+      if (socketRef.current) {
+        socketRef.current.emit('fetch-chat-history', { targetId: userId });
+      }
     }
   };
 
@@ -166,7 +187,9 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
         <ChatAreaContainer>
           <MessageContainer ref={chatContainerRef}>
             {selectedUser ? (
-              chatMessages.length > 0 ? (
+              isLoading ? (
+                <PlaceholderText>Loading messages...</PlaceholderText>
+              ) : chatMessages.length > 0 ? (
                 chatMessages.map((msg, index) => (
                   <MessageWrapper key={index} isSelf={msg.isSelf}>
                     <MessageBubble isSelf={msg.isSelf}>
