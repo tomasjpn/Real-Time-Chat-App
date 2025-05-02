@@ -10,12 +10,7 @@ const server = Fastify({
 
 async function startServer() {
   try {
-    // Run database migrations
-    const dbInitialized = await initializeDatabase();
-    if (!dbInitialized) {
-      throw new Error('Failed to initialize database');
-    }
-
+    await initializeDatabase(server);
     await registerPlugins(server);
 
     //-----------------------------------------------------------------------------//

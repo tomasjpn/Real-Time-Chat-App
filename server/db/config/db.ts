@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { FastifyInstance } from 'fastify';
 import pkg from 'pg';
 import { sql } from 'drizzle-orm';
 import { CONFIG } from './config.js';
@@ -17,17 +18,19 @@ export const pool = new Pool({
 export const db = drizzle(pool);
 
 // Run migrations
-export async function initializeDatabase() {
+export async function initializeDatabase(server: FastifyInstance) {
   try {
-    console.log('Running migrations...');
+    server.log.info('Initializing database: starting migration process...');
 
-    console.log('Dropping existing tables...');
+    server.log.info(
+      'Dropping existing tables: messages, user_chatrooms, chatrooms, users'
+    );
     await db.execute(sql`DROP TABLE IF EXISTS messages CASCADE;`);
     await db.execute(sql`DROP TABLE IF EXISTS user_chatrooms CASCADE;`);
     await db.execute(sql`DROP TABLE IF EXISTS chatrooms CASCADE;`);
     await db.execute(sql`DROP TABLE IF EXISTS users CASCADE;`);
 
-    // Create the users table
+    server.log.info('Creating table: users');
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -36,7 +39,8 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    // Create the chatrooms table
+
+    server.log.info('Creating table: chatrooms');
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS chatrooms (
         id SERIAL PRIMARY KEY,
@@ -45,7 +49,9 @@ export async function initializeDatabase() {
       );
     `);
 
-    // Junction table (join table) many -> many  relation
+    server.log.info(
+      'Creating table: user_chatrooms (junction table for users <-> chatrooms)'
+    );
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS user_chatrooms (
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -54,7 +60,7 @@ export async function initializeDatabase() {
       );
     `);
 
-    // Create the messages table
+    server.log.info('Creating table: messages');
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
@@ -65,10 +71,10 @@ export async function initializeDatabase() {
       );
     `);
 
-    console.log('Database setup completed successfully');
+    server.log.info('Database setup completed successfully');
     return true;
   } catch (error) {
-    console.error('Database setup failed:', error);
+    server.log.error('Database setup failed:', error);
     return false;
   }
 }
