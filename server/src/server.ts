@@ -1,11 +1,8 @@
-import cors from '@fastify/cors';
 import Fastify from 'fastify';
-import fastifyIO from 'fastify-socket.io';
-import fastifyPostgres from '@fastify/postgres';
 import { db, initializeDatabase } from '../db/config/db.js';
 import { sql } from 'drizzle-orm';
-import { CONFIG } from '../db/config/config.js';
 import { v4 as uuidv4 } from 'uuid';
+import { registerPlugins } from './plugins/index.js';
 
 const server = Fastify({
   logger: true,
@@ -19,26 +16,7 @@ async function startServer() {
       throw new Error('Failed to initialize database');
     }
 
-    // Register PostgreSQL
-    await server.register(fastifyPostgres, {
-      connectionString: CONFIG.db.connectionString,
-    });
-
-    // Register CORS
-    await server.register(cors, {
-      origin: ['http://localhost:5173'], // Vite-React app's origin
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      credentials: true,
-    });
-
-    // Register the Fastify-socket.io
-    await server.register(fastifyIO, {
-      cors: {
-        origin: ['http://localhost:5173'],
-        methods: ['GET', 'POST'],
-      },
-    });
+    await registerPlugins(server);
 
     //-----------------------------------------------------------------------------//
 
