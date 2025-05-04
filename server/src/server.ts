@@ -3,6 +3,7 @@ import { db, initializeDatabase } from '../db/config/db.js';
 import { sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { registerPlugins } from './plugins/index.js';
+import { initializeRoutes } from './routes/index.js';
 
 const server = Fastify({
   logger: true,
@@ -12,92 +13,7 @@ async function startServer() {
   try {
     await initializeDatabase(server);
     await registerPlugins(server);
-
-    //-----------------------------------------------------------------------------//
-
-    // Example route using the database
-    server.get('/users', async () => {
-      try {
-        const users = await db.execute(sql`SELECT * FROM users`);
-        return users;
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        return { error: 'Failed to fetch users' };
-      }
-    });
-
-    // Default "/" Path
-    server.get('/', async () => {
-      return { message: 'Chat server is running' };
-    });
-
-    server.get(
-      '/chat-history/:userUuid/:targetUserUuid',
-      async (request, reply) => {
-        try {
-          const { userUuid, targetUserUuid } = request.params as {
-            userUuid: string;
-            targetUserUuid: string;
-          };
-
-          const getUserResult = await db.execute(sql`
-          SELECT id FROM users WHERE uuid = ${userUuid} LIMIT 1
-        `);
-
-          const getTargetUserResult = await db.execute(sql`
-          SELECT id FROM users WHERE uuid = ${targetUserUuid} LIMIT 1
-        `);
-
-          if (!getUserResult.rows.length || !getTargetUserResult.rows.length) {
-            return reply
-              .code(404)
-              .send({ error: 'One or both users not found' });
-          }
-
-          const userId = getUserResult.rows[0].id;
-          const targetUserId = getTargetUserResult.rows[0].id;
-
-          const sharedChatroomsResult = await db.execute(sql`
-          SELECT uc1.chatroom_id 
-          FROM user_chatrooms uc1
-          JOIN user_chatrooms uc2 ON uc1.chatroom_id = uc2.chatroom_id
-          WHERE uc1.user_id = ${userId} AND uc2.user_id = ${targetUserId}
-          LIMIT 1
-        `);
-
-          if (!sharedChatroomsResult.rows.length) {
-            return reply.send({ messages: [] });
-          }
-
-          const extractedChatroomId = sharedChatroomsResult.rows[0].chatroom_id;
-
-          // Get messages from this chatroom with sender information
-          const getMessagesResult = await db.execute(sql`
-            SELECT m.id, m.user_id, m.content, m.created_at, u.name as sender_name, u.uuid as sender_uuid
-            FROM messages m
-            JOIN users u ON m.user_id = u.id
-            WHERE m.chatroom_id = ${extractedChatroomId}
-            ORDER BY m.created_at ASC
-          `);
-
-          // Format messages for client
-          const formattedMessages = getMessagesResult.rows.map((msg) => ({
-            senderId: msg.sender_uuid,
-            senderName: msg.sender_name,
-            message: msg.content,
-            timestamp: msg.created_at,
-            isSelf: msg.sender_uuid === userUuid,
-          }));
-
-          return reply.send({ formattedMessages });
-        } catch (error) {
-          console.error('Error fetching chat history:', error);
-          return reply
-            .code(500)
-            .send({ error: 'Failed to fetch chat history' });
-        }
-      }
-    );
+    await initializeRoutes(server);
 
     //-----------------------------------------------------------------------------//
 
