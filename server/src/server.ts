@@ -4,6 +4,12 @@ import { sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { registerPlugins } from './plugins/index.js';
 import { initializeRoutes } from './routes/index.js';
+import {
+  ChatroomRecord,
+  connectedUsersMap,
+  socketToUuidMap,
+  UserRecord,
+} from './types/server.js';
 
 const server = Fastify({
   logger: true,
@@ -18,28 +24,10 @@ async function startServer() {
     //-----------------------------------------------------------------------------//
 
     // Map to track connected users with their UUID and socket info
-    const connectedUsers: Record<
-      string,
-      {
-        socketId: string;
-        userName: string;
-        dbUserId?: number;
-      }
-    > = {};
+    const connectedUsers: connectedUsersMap = {};
 
     // Reverse mapping for quick lookup: { socketId: uuid }
-    const socketToUuid: Record<string, string> = {};
-
-    type UserRecord = {
-      id: number;
-      uuid: string;
-      name: string;
-    };
-
-    type ChatroomRecord = {
-      id: number;
-      name: string;
-    };
+    const socketToUuid: socketToUuidMap = {};
 
     //-----------------------------------------------------------------------------//
 
