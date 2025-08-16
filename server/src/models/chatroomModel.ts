@@ -1,49 +1,44 @@
 import { db } from '../../db/config/db.js';
-import { sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { ChatroomRecord } from '../types/server.js';
+import { chatrooms, userChatrooms } from '../../db/schema.js';
+import { alias } from 'drizzle-orm/pg-core';
 
 export async function createChatroom(name: string): Promise<ChatroomRecord> {
-  const insertedChatroomResult = await db.execute(sql`
-    INSERT INTO chatrooms (name) VALUES (${name}) RETURNING *
-  `);
+  const [insertedChatroomResult] = await db
+    .insert(chatrooms)
+    .values({ name })
+    .returning();
 
-  const extractedInsertedChatroom = Array.isArray(insertedChatroomResult)
-    ? (insertedChatroomResult[0] as ChatroomRecord)
-    : (insertedChatroomResult.rows[0] as ChatroomRecord);
-
-  return extractedInsertedChatroom;
+  return insertedChatroomResult;
 }
 
 export async function addUserToChatroom(
   userId: number,
   chatroomId: number
 ): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO user_chatrooms (user_id, chatroom_id) 
-    VALUES (${userId}, ${chatroomId})
-  `);
+  await db.insert(userChatrooms).values({ userId, chatroomId });
 }
 
 export async function getSharedChatroom(
   userId1: number,
   userId2: number
 ): Promise<number | null> {
-  const getSharedChatroomsResult = await db.execute(sql`
-    SELECT uc1.chatroom_id 
-    FROM user_chatrooms uc1
-    JOIN user_chatrooms uc2 ON uc1.chatroom_id = uc2.chatroom_id
-    WHERE uc1.user_id = ${userId1} AND uc2.user_id = ${userId2}
-    LIMIT 1
-  `);
+  const uc2 = alias(userChatrooms, 'uc2');
 
-  if (
-    getSharedChatroomsResult.rows &&
-    getSharedChatroomsResult.rows.length > 0
-  ) {
-    return Number(getSharedChatroomsResult.rows[0].chatroom_id);
-  }
+  const getSharedChatroomsResult = await db
+    .select({ chatroomId: userChatrooms.chatroomId })
+    .from(userChatrooms)
+    .innerJoin(
+      uc2,
+      and(eq(userChatrooms.chatroomId, uc2.chatroomId), eq(uc2.userId, userId2))
+    )
+    .where(eq(userChatrooms.userId, userId1))
+    .limit(1);
 
-  return null;
+  return getSharedChatroomsResult.length > 0
+    ? Number(getSharedChatroomsResult[0].chatroomId)
+    : null;
 }
 
 export async function createSharedChatroom(
@@ -51,18 +46,15 @@ export async function createSharedChatroom(
   userId2: number,
   chatroomName: string
 ): Promise<number> {
-  const newChatroomResult = await db.execute(sql`
-    INSERT INTO chatrooms (name) 
-    VALUES (${chatroomName}) 
-    RETURNING id
-  `);
+  const [newChatroomResult] = await db
+    .insert(chatrooms)
+    .values({ name: chatroomName })
+    .returning({ chatroomId: chatrooms.id });
 
-  const chatroomId = Number(newChatroomResult.rows[0].id);
+  await db.insert(userChatrooms).values([
+    { userId: userId1, chatroomId: newChatroomResult.chatroomId },
+    { userId: userId2, chatroomId: newChatroomResult.chatroomId },
+  ]);
 
-  await db.execute(sql`
-    INSERT INTO user_chatrooms (user_id, chatroom_id) 
-    VALUES (${userId1}, ${chatroomId}), (${userId2}, ${chatroomId})
-  `);
-
-  return chatroomId;
+  return newChatroomResult.chatroomId;
 }
