@@ -1,43 +1,46 @@
 import { db } from '../../db/config/db.js';
-import { sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { UserRecord } from '../types/server.js';
+import { users } from '../../db/schema.js';
 
 export async function getUserByName(
   userName: string
 ): Promise<UserRecord | null> {
-  const result = await db.execute(sql`
-    SELECT id, uuid, name FROM users WHERE name = ${userName} LIMIT 1
-  `);
+  const [result] = await db
+    .select({
+      id: users.id,
+      uuid: users.uuid,
+      name: users.name,
+    })
+    .from(users)
+    .where(eq(users.name, userName))
+    .limit(1);
 
-  return result.rows && result.rows.length > 0
-    ? (result.rows[0] as UserRecord)
-    : null;
+  return result ?? null;
 }
 
 export async function createUser(userName: string): Promise<UserRecord> {
-  // Generate UUID for the user
   const userUuid = uuidv4();
 
-  // Insert the user into the database
-  const insertedUserResult = await db.execute(sql`
-    INSERT INTO users (uuid, name) VALUES (${userUuid}, ${userName}) RETURNING *
-  `);
+  const [insertedUserResult] = await db
+    .insert(users)
+    .values({ uuid: userUuid, name: userName })
+    .returning({ id: users.id, uuid: users.uuid, name: users.name });
 
-  // Extract user data from the result
-  const extractedInsertedUser = Array.isArray(insertedUserResult)
-    ? (insertedUserResult[0] as UserRecord)
-    : (insertedUserResult.rows[0] as UserRecord);
-
-  return extractedInsertedUser;
+  return insertedUserResult;
 }
 
 export async function getUserById(uuid: string): Promise<UserRecord | null> {
-  const getUserResult = await db.execute(sql`
-    SELECT id, uuid, name FROM users WHERE uuid = ${uuid} LIMIT 1
-  `);
+  const [getUserResult] = await db
+    .select({
+      id: users.id,
+      uuid: users.uuid,
+      name: users.name,
+    })
+    .from(users)
+    .where(eq(users.uuid, uuid))
+    .limit(1);
 
-  return getUserResult.rows && getUserResult.rows.length > 0
-    ? (getUserResult.rows[0] as UserRecord)
-    : null;
+  return getUserResult ?? null;
 }
