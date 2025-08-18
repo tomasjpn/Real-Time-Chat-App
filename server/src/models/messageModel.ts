@@ -1,5 +1,6 @@
 import { db } from '../../db/config/db.js';
-import { sql } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
+import { messages, users } from '../../db/schema.js';
 
 export interface MessageWithSender {
   senderId: string;
@@ -14,41 +15,41 @@ export async function saveMessageToDb(
   userId: number,
   content: string
 ): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO messages (chatroom_id, user_id, content) 
-    VALUES (${chatroomId}, ${userId}, ${content})
-  `);
+  await db.insert(messages).values({
+    chatroomId,
+    userId,
+    content,
+  });
 }
 
 export async function getChatHistoryFromDb(
   chatroomId: number,
   currentUserUuid: string
 ): Promise<MessageWithSender[]> {
-  const getMessagesResult = await db.execute(sql`
-    SELECT m.id, m.user_id, m.content, m.created_at, u.name as sender_name, u.uuid as sender_uuid
-    FROM messages m
-    JOIN users u ON m.user_id = u.id
-    WHERE m.chatroom_id = ${chatroomId}
-    ORDER BY m.created_at ASC
-  `);
+  const getMessagesResult = await db
+    .select({
+      id: messages.id,
+      userId: messages.userId,
+      content: messages.content,
+      createdAt: messages.createdAt,
+      senderName: users.name,
+      senderUuid: users.uuid,
+    })
+    .from(messages)
+    .innerJoin(users, eq(messages.userId, users.id))
+    .where(eq(messages.chatroomId, chatroomId))
+    .orderBy(asc(messages.createdAt));
 
-  const formattedMessages = getMessagesResult.rows.map((msg) => {
-    const timestamp =
-      msg.created_at instanceof Date
-        ? msg.created_at
-        : typeof msg.created_at === 'string' ||
-            typeof msg.created_at === 'number'
-          ? new Date(msg.created_at)
-          : new Date();
-
-    return {
-      senderId: String(msg.sender_uuid),
-      senderName: String(msg.sender_name),
-      message: String(msg.content),
-      timestamp: timestamp,
-      isSelf: String(msg.sender_uuid) === currentUserUuid,
-    };
-  });
-
-  return formattedMessages;
+  return getMessagesResult.map((msg) => ({
+    senderId: String(msg.senderUuid),
+    senderName: String(msg.senderName),
+    message: String(msg.content),
+    timestamp:
+      msg.createdAt instanceof Date
+        ? msg.createdAt
+        : typeof msg.createdAt === 'string' || typeof msg.createdAt === 'number'
+          ? new Date(msg.createdAt)
+          : new Date(),
+    isSelf: String(msg.senderUuid) === currentUserUuid,
+  }));
 }
