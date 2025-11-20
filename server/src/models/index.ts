@@ -1,4 +1,4 @@
 // database operations
-export * from './userModel.js';
-export * from './chatroomModel.js';
-export * from './messageModel.js';
+export * from './user-model.js';
+export * from './chatroom-model.js';
+export * from './message-model.js';

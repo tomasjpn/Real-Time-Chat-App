@@ -2,8 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { db } from '../../db/config/db.js';
 import { eq } from 'drizzle-orm';
 import { users } from '../../db/schema.js';
-import { getSharedChatroom } from '../models/chatroomModel.js';
-import { getChatHistoryFromDb } from '../models/messageModel.js';
+import { getSharedChatroom } from '../models/chatroom-model.js';
+import { getChatHistoryFromDb } from '../models/message-model.js';
 
 export default async function chatRoutes(server: FastifyInstance) {
   server.get(

@@ -15,7 +15,7 @@ import {
   InputDiv,
   InputElm,
   SendMsgBtn,
-} from '../styles/components/CurrentChat';
+} from '../styles/components/current-chat.ts';
 
 interface Message {
   senderId: string;

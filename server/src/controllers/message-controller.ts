@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
 import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
-import { getUserById } from '../models/userModel.js';
+import { getUserById } from '../models/user-model.js';
 import { getSharedChatroom, createSharedChatroom } from '../models/index.js';
 import { saveMessageToDb, getChatHistoryFromDb } from '../models/index.js';
 import {

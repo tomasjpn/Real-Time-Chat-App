@@ -1,7 +1,7 @@
 // App.tsx
 import { useState, useRef, useEffect } from 'react';
-import { FullScreenGrid } from '../src/styles/components/App';
-import CurrentChat from './components/CurrentChat';
+import { FullScreenGrid } from './styles/components/app.ts';
+import CurrentChat from './components/current-chat.tsx';
 
 function App() {
   const [userName, setUserName] = useState('');

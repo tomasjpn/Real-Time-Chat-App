@@ -1,8 +1,8 @@
 import { Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
 import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
-import { registerUserHandlers } from './userController.js';
-import { registerMessageHandlers } from './messageController.js';
+import { registerUserHandlers } from './user-controller.js';
+import { registerMessageHandlers } from './message-controller.js';
 import {
   CONNECTION,
   DISCONNECT,

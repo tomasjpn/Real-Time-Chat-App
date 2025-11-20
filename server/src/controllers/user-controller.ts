@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
 import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
-import { getUserByName, createUser } from '../models/userModel.js';
+import { getUserByName, createUser } from '../models/user-model.js';
 import { createChatroom, addUserToChatroom } from '../models/index.js';
 import {
   NEW_USER,

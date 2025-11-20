@@ -1,4 +1,4 @@
 // socket event handlers
-export * from './socketController.js';
-export * from './userController.js';
-export * from './messageController.js';
+export * from './socket-controller.js';
+export * from './user-controller.js';
+export * from './message-controller.js';
