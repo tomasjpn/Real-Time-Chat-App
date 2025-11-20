@@ -13,7 +13,7 @@ export async function registerPlugins(server: FastifyInstance) {
 
   // CORS
   await server.register(cors, {
-    origin: ['http://localhost:5173'],
+    origin: ['http://localhost:5173', 'http://localhost:4173'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -23,7 +23,7 @@ export async function registerPlugins(server: FastifyInstance) {
   // Socket.IO
   await server.register(fastifyIO, {
     cors: {
-      origin: ['http://localhost:5173'],
+      origin: ['http://localhost:5173', 'http://localhost:4173'],
       methods: ['GET', 'POST'],
     },
   });
