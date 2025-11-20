@@ -17,6 +17,18 @@ import {
   SendMsgBtn,
 } from '../styles/components/current-chat.ts';
 
+import {
+  CHAT_HISTORY,
+  CONNECTION,
+  CONNECTION_ERROR,
+  FETCH_CHAT_HISTORY,
+  NEW_USER,
+  PRIVATE_MESSAGE,
+  RECEIVE_PRIVATE_MESSAGE,
+  SELF_ID,
+  USER_LIST,
+} from '../../server/src/socket-events/socket-events.js';
+
 interface Message {
   senderId: string;
   senderName: string;
@@ -53,29 +65,29 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       Handling connection failures from next(error)
       connect_error built-in Socket.IO event --> correlation with server.ts/next(error) 
     */
-    socket.on('connect_error', (error) => {
+    socket.on(CONNECTION_ERROR, (error) => {
       console.error('Connection error:', error);
       setConnectionError(true);
       socket.disconnect();
     });
     // Successful connection
-    socket.on('connect', () => {
+    socket.on(CONNECTION, () => {
       console.log('Connected to server');
-      socket.emit('new-user', userName);
+      socket.emit(NEW_USER, userName);
     });
 
-    socket.on('self-id', (id: string) => {
+    socket.on(SELF_ID, (id: string) => {
       console.log('Received self ID:', id);
       setSelfId(id);
     });
 
-    socket.on('user-list', (users: Record<string, string>) => {
+    socket.on(USER_LIST, (users: Record<string, string>) => {
       console.log('Received user list:', users);
       setConnectedUsers(users);
     });
 
     socket.on(
-      'receive-private-message',
+      RECEIVE_PRIVATE_MESSAGE,
       (data: { senderId: string; senderName: string; message: string }) => {
         console.log('Received private message:', data);
         if (data.senderId === selectedUser || !selectedUser) {
@@ -90,18 +102,15 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       }
     );
 
-    socket.on(
-      'chat-history',
-      (data: { messages: Message[]; error?: string }) => {
-        console.log('Received chat history:', data);
-        if (data.error) {
-          console.error('Error fetching chat history:', data.error);
-        } else {
-          setChatMessages(data.messages);
-        }
-        setIsLoading(false);
+    socket.on(CHAT_HISTORY, (data: { messages: Message[]; error?: string }) => {
+      console.log('Received chat history:', data);
+      if (data.error) {
+        console.error('Error fetching chat history:', data.error);
+      } else {
+        setChatMessages(data.messages);
       }
-    );
+      setIsLoading(false);
+    });
 
     return () => {
       socket.disconnect();
@@ -125,7 +134,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       message: messageInputValue.trim(),
     };
 
-    socketRef.current.emit('private-message', messageData);
+    socketRef.current.emit(PRIVATE_MESSAGE, messageData);
 
     // Add message to local state
     setChatMessages((prev) => [
@@ -148,7 +157,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       setIsLoading(true);
 
       if (socketRef.current) {
-        socketRef.current.emit('fetch-chat-history', { targetId: userId });
+        socketRef.current.emit(FETCH_CHAT_HISTORY, { targetId: userId });
       }
     }
   };

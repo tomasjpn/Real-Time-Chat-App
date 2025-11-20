@@ -8,6 +8,7 @@ import {
   CHAT_HISTORY,
   FETCH_CHAT_HISTORY,
   PRIVATE_MESSAGE,
+  RECEIVE_PRIVATE_MESSAGE,
 } from '../socket-events/socket-events.js';
 
 export function registerMessageHandlers(
@@ -47,7 +48,7 @@ export function registerMessageHandlers(
           server.log.warn(
             'User ID not found in memory, sending message without saving to DB'
           );
-          server.io.to(targetSocketId).emit('receive-private-message', {
+          server.io.to(targetSocketId).emit(RECEIVE_PRIVATE_MESSAGE, {
             senderId: senderUuid,
             senderName: senderName,
             message: message,
@@ -67,14 +68,14 @@ export function registerMessageHandlers(
 
         await saveMessageToDb(chatroomId, userId, message);
 
-        server.io.to(targetSocketId).emit('receive-private-message', {
+        server.io.to(targetSocketId).emit(RECEIVE_PRIVATE_MESSAGE, {
           senderId: senderUuid,
           senderName: senderName,
           message: message,
         });
       } catch (error) {
         console.error('Error sending private message:', error);
-        server.io.to(targetSocketId).emit('receive-private-message', {
+        server.io.to(targetSocketId).emit(RECEIVE_PRIVATE_MESSAGE, {
           senderId: senderUuid,
           senderName: senderName,
           message: message,
@@ -112,7 +113,7 @@ export function registerMessageHandlers(
         );
 
         // No messages yet in a new chatroom
-        socket.emit('chat-history', { messages: [] });
+        socket.emit(CHAT_HISTORY, { messages: [] });
         return;
       }
 

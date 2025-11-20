@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { userRoutes } from './userRoute.js';
-import chatRoutes from './chatRoute.js';
+import { userRoutes } from './user-route.js';
+import chatRoutes from './chat-route.js';
 
 export async function initializeRoutes(server: FastifyInstance) {
   server.log.info('Initializing API routes');
