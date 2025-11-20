@@ -3,6 +3,11 @@ import { FastifyInstance } from 'fastify';
 import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
 import { getUserByName, createUser } from '../models/userModel.js';
 import { createChatroom, addUserToChatroom } from '../models/index.js';
+import {
+  NEW_USER,
+  SELF_ID,
+  USER_LIST,
+} from '../socket-events/socket-events.js';
 
 export function registerUserHandlers(
   socket: Socket,
@@ -10,7 +15,7 @@ export function registerUserHandlers(
   connectedUsers: connectedUsersMap,
   socketToUuid: socketToUuidMap
 ): void {
-  socket.on('new-user', async (userName: string) => {
+  socket.on(NEW_USER, async (userName: string) => {
     try {
       let userUuid: string;
       let userId: number;
@@ -43,7 +48,7 @@ export function registerUserHandlers(
       socketToUuid[socket.id] = userUuid;
 
       // Send the user their own UUID and the current user list
-      socket.emit('self-id', userUuid);
+      socket.emit(SELF_ID, userUuid);
 
       // Transform the user list to send to clients
       const userListForClients = Object.entries(connectedUsers).reduce(
@@ -54,7 +59,7 @@ export function registerUserHandlers(
         {} as Record<string, string>
       );
 
-      server.io.emit('user-list', userListForClients);
+      server.io.emit(USER_LIST, userListForClients);
     } catch (error) {
       console.error('Error creating new user:', error);
     }

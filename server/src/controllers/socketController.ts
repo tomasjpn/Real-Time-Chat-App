@@ -3,6 +3,11 @@ import { FastifyInstance } from 'fastify';
 import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
 import { registerUserHandlers } from './userController.js';
 import { registerMessageHandlers } from './messageController.js';
+import {
+  CONNECTION,
+  DISCONNECT,
+  USER_LIST,
+} from '../socket-events/socket-events.js';
 
 // Central store for connected users
 export const connectedUsers: connectedUsersMap = {};
@@ -21,14 +26,14 @@ export function initializeSocketControllers(server: FastifyInstance): void {
      * socket.on => no real-time Websocket connection from Socket.IO rather just fastify own events
      */
 
-    server.io.on('connection', (socket: Socket) => {
+    server.io.on(CONNECTION, (socket: Socket) => {
       server.log.info('A user connected:', socket.id);
 
       registerUserHandlers(socket, server, connectedUsers, socketToUuid);
       registerMessageHandlers(socket, server, connectedUsers, socketToUuid);
 
       // Handle socket disconnection
-      socket.on('disconnect', () => {
+      socket.on(DISCONNECT, () => {
         server.log.info('User disconnected:', socket.id);
 
         // Find and remove user by socket ID
@@ -46,7 +51,7 @@ export function initializeSocketControllers(server: FastifyInstance): void {
             {} as Record<string, string>
           );
 
-          server.io.emit('user-list', userListForClients);
+          server.io.emit(USER_LIST, userListForClients);
         }
       });
     });

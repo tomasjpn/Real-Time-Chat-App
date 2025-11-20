@@ -4,6 +4,11 @@ import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
 import { getUserById } from '../models/userModel.js';
 import { getSharedChatroom, createSharedChatroom } from '../models/index.js';
 import { saveMessageToDb, getChatHistoryFromDb } from '../models/index.js';
+import {
+  CHAT_HISTORY,
+  FETCH_CHAT_HISTORY,
+  PRIVATE_MESSAGE,
+} from '../socket-events/socket-events.js';
 
 export function registerMessageHandlers(
   socket: Socket,
@@ -12,7 +17,7 @@ export function registerMessageHandlers(
   socketToUuid: socketToUuidMap
 ): void {
   socket.on(
-    'private-message',
+    PRIVATE_MESSAGE,
     async ({ targetId, message }: { targetId: string; message: string }) => {
       // Get sender's UUID from socketId
       const senderUuid = socketToUuid[socket.id];
@@ -78,51 +83,48 @@ export function registerMessageHandlers(
     }
   );
 
-  socket.on(
-    'fetch-chat-history',
-    async ({ targetId }: { targetId: string }) => {
-      const senderUuid = socketToUuid[socket.id];
-      if (!senderUuid || !connectedUsers[senderUuid]) {
-        server.log.warn('Unknown sender, cannot fetch chat history');
+  socket.on(FETCH_CHAT_HISTORY, async ({ targetId }: { targetId: string }) => {
+    const senderUuid = socketToUuid[socket.id];
+    if (!senderUuid || !connectedUsers[senderUuid]) {
+      server.log.warn('Unknown sender, cannot fetch chat history');
+      return;
+    }
+
+    try {
+      const currentUser = await getUserById(senderUuid);
+      const targetUser = await getUserById(targetId);
+
+      if (!currentUser || !targetUser) {
+        socket.emit(CHAT_HISTORY, {
+          error: 'One or both users not found',
+          messages: [],
+        });
         return;
       }
 
-      try {
-        const currentUser = await getUserById(senderUuid);
-        const targetUser = await getUserById(targetId);
+      let chatroomId = await getSharedChatroom(currentUser.id, targetUser.id);
 
-        if (!currentUser || !targetUser) {
-          socket.emit('chat-history', {
-            error: 'One or both users not found',
-            messages: [],
-          });
-          return;
-        }
+      if (!chatroomId) {
+        chatroomId = await createSharedChatroom(
+          currentUser.id,
+          targetUser.id,
+          `room_${senderUuid}_${targetId}`
+        );
 
-        let chatroomId = await getSharedChatroom(currentUser.id, targetUser.id);
-
-        if (!chatroomId) {
-          chatroomId = await createSharedChatroom(
-            currentUser.id,
-            targetUser.id,
-            `room_${senderUuid}_${targetId}`
-          );
-
-          // No messages yet in a new chatroom
-          socket.emit('chat-history', { messages: [] });
-          return;
-        }
-
-        const messages = await getChatHistoryFromDb(chatroomId, senderUuid);
-
-        socket.emit('chat-history', { messages });
-      } catch (error) {
-        server.log.error('Error fetching chat history:', error);
-        socket.emit('chat-history', {
-          error: 'Failed to fetch chat history',
-          messages: [],
-        });
+        // No messages yet in a new chatroom
+        socket.emit('chat-history', { messages: [] });
+        return;
       }
+
+      const messages = await getChatHistoryFromDb(chatroomId, senderUuid);
+
+      socket.emit(CHAT_HISTORY, { messages });
+    } catch (error) {
+      server.log.error('Error fetching chat history:', error);
+      socket.emit(CHAT_HISTORY, {
+        error: 'Failed to fetch chat history',
+        messages: [],
+      });
     }
-  );
+  });
 }
