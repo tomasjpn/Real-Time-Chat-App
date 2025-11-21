@@ -4,8 +4,8 @@ import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
 import { registerUserHandlers } from './user-controller.js';
 import { registerMessageHandlers } from './message-controller.js';
 import {
-  CONNECTION,
-  DISCONNECT,
+  SERVER_DISCONNECT,
+  SERVER_CONNECTION,
   USER_LIST,
 } from '../socket-events/socket-events.js';
 
@@ -26,14 +26,14 @@ export function initializeSocketControllers(server: FastifyInstance): void {
      * socket.on => no real-time Websocket connection from Socket.IO rather just fastify own events
      */
 
-    server.io.on(CONNECTION, (socket: Socket) => {
+    server.io.on(SERVER_CONNECTION, (socket: Socket) => {
       server.log.info('A user connected:', socket.id);
 
       registerUserHandlers(socket, server, connectedUsers, socketToUuid);
       registerMessageHandlers(socket, server, connectedUsers, socketToUuid);
 
       // Handle socket disconnection
-      socket.on(DISCONNECT, () => {
+      socket.on(SERVER_DISCONNECT, () => {
         server.log.info('User disconnected:', socket.id);
 
         // Find and remove user by socket ID

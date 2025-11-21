@@ -4,11 +4,12 @@ const CHAT_HISTORY = 'chat-history';
 const RECEIVE_PRIVATE_MESSAGE = 'receive-private-message';
 const USER_LIST = 'user-list';
 const NEW_USER = 'new-user';
-const CONNECTION = 'connection';
-const DISCONNECT = 'disconnect';
+const CLIENT_CONNECTION = 'connect';
+const SERVER_CONNECTION = 'connection';
+const SERVER_DISCONNECT = 'disconnect';
 const SELF_ID = 'self-id';
 
-const CONNECTION_ERROR = 'connect_error';
+const CONNECT_ERROR = 'connect_error';
 
 export {
   PRIVATE_MESSAGE,
@@ -17,8 +18,9 @@ export {
   RECEIVE_PRIVATE_MESSAGE,
   USER_LIST,
   NEW_USER,
-  CONNECTION,
-  DISCONNECT,
+  CLIENT_CONNECTION,
+  SERVER_CONNECTION,
+  SERVER_DISCONNECT,
   SELF_ID,
-  CONNECTION_ERROR,
+  CONNECT_ERROR,
 };

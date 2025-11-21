@@ -19,8 +19,8 @@ import {
 
 import {
   CHAT_HISTORY,
-  CONNECTION,
-  CONNECTION_ERROR,
+  CLIENT_CONNECTION,
+  CONNECT_ERROR,
   FETCH_CHAT_HISTORY,
   NEW_USER,
   PRIVATE_MESSAGE,
@@ -65,13 +65,13 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       Handling connection failures from next(error)
       connect_error built-in Socket.IO event --> correlation with server.ts/next(error) 
     */
-    socket.on(CONNECTION_ERROR, (error) => {
+    socket.on(CONNECT_ERROR, (error) => {
       console.error('Connection error:', error);
       setConnectionError(true);
       socket.disconnect();
     });
     // Successful connection
-    socket.on(CONNECTION, () => {
+    socket.on(CLIENT_CONNECTION, () => {
       console.log('Connected to server');
       socket.emit(NEW_USER, userName);
     });
