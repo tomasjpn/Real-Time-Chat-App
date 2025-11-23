@@ -1,20 +1,22 @@
+import Avatar from '@mui/material/Avatar';
 import { useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import {
-  MainGrid,
-  UserInfoBar,
-  ChatContainer,
-  UserListContainer,
-  UserItem,
   ChatAreaContainer,
-  MessageContainer,
-  MessageWrapper,
-  MessageBubble,
-  SenderName,
-  PlaceholderText,
+  ChatContainer,
   InputDiv,
   InputElm,
+  MainGrid,
+  MessageBubble,
+  MessageContainer,
+  MessageWrapper,
+  PlaceholderText,
+  SenderName,
   SendMsgBtn,
+  StyledBadge,
+  UserInfoBar,
+  UserItem,
+  UserListContainer,
 } from '../styles/components/current-chat.ts';
 
 import {
@@ -171,6 +173,13 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   return (
     <MainGrid>
       <UserInfoBar>
+        <StyledBadge
+          overlap="circular"
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          variant="dot"
+        >
+          <Avatar alt={userName} src="" />
+        </StyledBadge>
         Logged in as: {userName} (Your ID: {selfId})
       </UserInfoBar>
 
@@ -186,6 +195,13 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
                   onClick={() => selectUser(id)}
                   isSelected={selectedUser === id}
                 >
+                  <StyledBadge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    variant="dot"
+                  >
+                    <Avatar alt={name} src="" />
+                  </StyledBadge>
                   {name} {selectedUser === id ? '(Selected)' : ''}
                 </UserItem>
               )

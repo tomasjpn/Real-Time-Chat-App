@@ -1,3 +1,4 @@
+import Badge from '@mui/material/Badge';
 import { styled } from '@mui/material/styles';
 
 const MainGrid = styled('div')(({ theme }) => ({
@@ -14,13 +15,16 @@ const MainGrid = styled('div')(({ theme }) => ({
 }));
 
 const UserInfoBar = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
   padding: theme.spacing(2),
   borderBottom: '0.1vw solid rgba(204, 204, 204, 0.3)',
 }));
 
 const ChatContainer = styled('div')(({ theme }) => ({
   display: 'flex',
-  height: '60vh',
+  height: '80vh',
   gap: theme.spacing(2.5),
 }));
 
@@ -34,6 +38,10 @@ const UserListContainer = styled('div')(({ theme }) => ({
 
 const UserItem = styled('div')<{ isSelected: boolean }>(
   ({ theme, isSelected }) => ({
+    gap: theme.spacing(1),
+    display: 'flex',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
     padding: theme.spacing(1),
     margin: `${theme.spacing(0.5)} 0`,
     cursor: 'pointer',
@@ -110,19 +118,50 @@ const SendMsgBtn = styled('button')({
   justifyContent: 'flex-end',
 });
 
+const StyledBadge = styled(Badge)(({ theme }) => ({
+  /* marginRight: theme.spacing(2), */
+  '& .MuiBadge-badge': {
+    backgroundColor: '#44b700',
+    color: '#44b700',
+    boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
+    '&::after': {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      borderRadius: '50%',
+      animation: 'ripple 1.2s infinite ease-in-out',
+      border: '1px solid currentColor',
+      content: '""',
+    },
+  },
+  '@keyframes ripple': {
+    '0%': {
+      transform: 'scale(.8)',
+      opacity: 1,
+    },
+    '100%': {
+      transform: 'scale(2.4)',
+      opacity: 0,
+    },
+  },
+}));
+
 export {
-  MainGrid,
-  UserInfoBar,
-  ChatContainer,
-  UserListContainer,
-  UserItem,
   ChatAreaContainer,
-  MessageContainer,
-  MessageWrapper,
-  MessageBubble,
-  SenderName,
-  PlaceholderText,
+  ChatContainer,
   InputDiv,
   InputElm,
+  MainGrid,
+  MessageBubble,
+  MessageContainer,
+  MessageWrapper,
+  PlaceholderText,
+  SenderName,
   SendMsgBtn,
+  StyledBadge,
+  UserInfoBar,
+  UserItem,
+  UserListContainer,
 };
