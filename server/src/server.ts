@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { initializeDatabase } from '../db/config/db.js';
 import { registerPlugins } from './plugins/index.js';
 import { initializeRoutes } from './routes/index.js';
-import { initializeSocketControllers } from './controllers/index.js';
+import { webSocketSetup } from './socket/index.js';
 
 const server = Fastify({
   logger: true,
@@ -16,7 +16,7 @@ async function startServer() {
 
     await initializeRoutes(server);
 
-    initializeSocketControllers(server);
+    await webSocketSetup(server);
 
     await server.listen({ port: 3000 });
   } catch (err) {
