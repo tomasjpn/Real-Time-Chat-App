@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/src/server.js"
   },
@@ -31,7 +31,8 @@
   },
   "devDependencies": {
     "@types/socket.io": "^3.0.1",
-    "drizzle-kit": "^0.31.4"
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.7.0"
   },
   "drizzle-kit": {
     "schema": "./schema.ts",
