@@ -1,24 +1,14 @@
-import { Grid2 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
-const FullScreenGrid = styled(Grid2)(({ theme }) => ({
+const FullScreenGrid = styled('div')(() => ({
   width: '100vw',
   height: '100vh',
-  maxWidth: '1920px',
-  maxHeight: '1080px',
-  margin: '0 auto',
-  display: 'grid',
-  gridTemplateColumns: 'repeat(12, 1fr)',
-  gap: theme.spacing(2),
-  padding: theme.spacing(2),
-  boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+  margin: 0,
+  padding: 0,
   overflow: 'hidden',
-  borderRadius: '5vw',
-  '& > h1': {
-    gridColumn: 'span 3',
-    margin: 0,
-    alignSelf: 'start',
-  },
+  backgroundColor: 'rgba(255, 255, 255, 0.02)',
 }));
 
 const StyledDiv = styled('div')({

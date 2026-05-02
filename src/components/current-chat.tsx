@@ -2,21 +2,30 @@ import Avatar from '@mui/material/Avatar';
 import { useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import {
+  Box,
+  Paper,
+  TextField,
+  IconButton,
+  Typography,
+  InputAdornment,
+} from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
+import {
   ChatAreaContainer,
-  ChatContainer,
+  ChatHeaderBar,
   InputDiv,
-  InputElm,
-  MainGrid,
+  MainContainer,
   MessageBubble,
   MessageContainer,
+  MessageGroup,
   MessageWrapper,
   PlaceholderText,
-  SenderName,
-  SendMsgBtn,
-  StyledBadge,
-  UserInfoBar,
-  UserItem,
+  SenderAvatar,
+  CurrentSenderName,
   UserListContainer,
+  UserListItem,
+  StyledBadge,
+  MessageContent,
 } from '../styles/components/current-chat.ts';
 
 import {
@@ -48,7 +57,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   const [connectionError, setConnectionError] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState<Record<string, string>>(
     {}
-  ); // Record -> { socket.id : userName }
+  );
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selfId, setSelfId] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -56,23 +65,19 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   const socketRef = useRef<Socket | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Setup socket connection - only once when component mounts
   useEffect(() => {
     const socket = io('http://localhost:3000', {
       reconnection: false,
     });
 
     socketRef.current = socket;
-    /*
-      Handling connection failures from next(error)
-      connect_error built-in Socket.IO event --> correlation with server.ts/next(error) 
-    */
+
     socket.on(CONNECT_ERROR, (error) => {
       console.error('Connection error:', error);
       setConnectionError(true);
       socket.disconnect();
     });
-    // Successful connection
+
     socket.on(CLIENT_CONNECTION, () => {
       console.log('Connected to server');
       socket.emit(NEW_USER, userName);
@@ -117,9 +122,8 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
     return () => {
       socket.disconnect();
     };
-  }, [userName]); // Only depend on userName
+  }, [userName]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
@@ -138,7 +142,6 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
 
     socketRef.current.emit(PRIVATE_MESSAGE, messageData);
 
-    // Add message to local state
     setChatMessages((prev) => [
       ...prev,
       {
@@ -148,7 +151,6 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
         isSelf: true,
       },
     ]);
-    // Reset the Input Field
     setMessageInputValue('');
   };
 
@@ -166,96 +168,276 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
 
   if (connectionError) {
     return (
-      <div>Cannot connect. Chat room is full. Please try again later.</div>
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'rgba(255, 255, 255, 0.7)',
+        }}
+      >
+        Cannot connect. Chat room is full. Please try again later.
+      </Box>
     );
   }
 
+  const selectedUserName = selectedUser ? connectedUsers[selectedUser] : null;
+
   return (
-    <MainGrid>
-      <UserInfoBar>
-        <StyledBadge
-          overlap="circular"
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          variant="dot"
+    <MainContainer>
+      {/* User List Sidebar */}
+      <UserListContainer className="user-list-container">
+        {/* User Profile Section */}
+        <Paper
+          className="self-area"
+          sx={{
+            background: 'rgba(255, 255, 255, 0.07)',
+            padding: 2,
+            marginBottom: 2,
+            borderRadius: 2,
+          }}
         >
-          <Avatar alt={userName} src="" />
-        </StyledBadge>
-        Logged in as: {userName} (Your ID: {selfId})
-      </UserInfoBar>
-
-      <ChatContainer>
-        {/* User List */}
-        <UserListContainer>
-          <h3>Select User to Chat</h3>
-          {Object.entries(connectedUsers).map(
-            ([id, name]) =>
-              id !== selfId && (
-                <UserItem
-                  key={id}
-                  onClick={() => selectUser(id)}
-                  isSelected={selectedUser === id}
-                >
-                  <StyledBadge
-                    overlap="circular"
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    variant="dot"
-                  >
-                    <Avatar alt={name} src="" />
-                  </StyledBadge>
-                  {name} {selectedUser === id ? '(Selected)' : ''}
-                </UserItem>
-              )
-          )}
-        </UserListContainer>
-
-        {/* Chat Area */}
-        <ChatAreaContainer>
-          <MessageContainer ref={chatContainerRef}>
-            {selectedUser ? (
-              isLoading ? (
-                <PlaceholderText>Loading messages...</PlaceholderText>
-              ) : chatMessages.length > 0 ? (
-                chatMessages.map((msg, index) => (
-                  <MessageWrapper key={index} isSelf={msg.isSelf}>
-                    <MessageBubble isSelf={msg.isSelf}>
-                      <SenderName>
-                        {msg.isSelf ? 'You' : msg.senderName}
-                      </SenderName>
-                      {msg.message}
-                    </MessageBubble>
-                  </MessageWrapper>
-                ))
-              ) : (
-                <PlaceholderText>
-                  Start your conversation with {connectedUsers[selectedUser]}
-                </PlaceholderText>
-              )
-            ) : (
-              <PlaceholderText>Select a user to start chatting</PlaceholderText>
-            )}
-          </MessageContainer>
-
-          <InputDiv>
-            <InputElm
-              type="text"
-              placeholder={
-                selectedUser ? 'Type your message...' : 'Select a user first'
-              }
-              value={messageInputValue}
-              onChange={(e) => setMessageInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              disabled={!selectedUser}
-            />
-            <SendMsgBtn
-              onClick={sendMessage}
-              disabled={!selectedUser || !messageInputValue.trim()}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <StyledBadge
+              overlap="circular"
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              variant="dot"
             >
-              Send
-            </SendMsgBtn>
-          </InputDiv>
-        </ChatAreaContainer>
-      </ChatContainer>
-    </MainGrid>
+              <Avatar alt={userName} src="" sx={{ width: 40, height: 40 }} />
+            </StyledBadge>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: 'rgba(255, 255, 255, 0.5)' }}
+              >
+                Logged in as
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: 'rgb(23, 189, 79)',
+                }}
+              >
+                {userName}
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Users Title */}
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            marginBottom: 1,
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            fontSize: '0.75rem',
+          }}
+        >
+          Direct Messages
+        </Typography>
+
+        {/* User List */}
+        <Box
+          className="user-to-chat-area"
+          sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}
+        >
+          {Object.entries(connectedUsers).length === 0 ? (
+            <Typography
+              variant="caption"
+              sx={{ color: 'rgba(255, 255, 255, 0.5)', padding: 1 }}
+            >
+              No users online
+            </Typography>
+          ) : (
+            Object.entries(connectedUsers).map(
+              ([id, name]) =>
+                id !== selfId && (
+                  <UserListItem
+                    key={id}
+                    onClick={() => selectUser(id)}
+                    isSelected={selectedUser === id}
+                  >
+                    <StyledBadge
+                      overlap="circular"
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                      variant="dot"
+                    >
+                      <Avatar
+                        alt={name}
+                        src=""
+                        sx={{ width: 32, height: 32 }}
+                      />
+                    </StyledBadge>
+                    <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
+                      {name}
+                    </Typography>
+                  </UserListItem>
+                )
+            )
+          )}
+        </Box>
+      </UserListContainer>
+
+      {/* Chat Area */}
+      <ChatAreaContainer className="chat-area-container">
+        {/* Chat Header */}
+        {selectedUser ? (
+          <ChatHeaderBar className="chat-header-bar">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <StyledBadge
+                className="status-badge"
+                overlap="circular"
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                variant="dot"
+              >
+                <Avatar alt={selectedUserName || ''} src="" />
+              </StyledBadge>
+              <Box className="chat-header-text">
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    lineHeight: '1vw',
+                    marginTop: '1vw',
+                  }}
+                >
+                  {selectedUserName}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'rgba(255, 255, 255, 0.5)' }}
+                >
+                  Active
+                </Typography>
+              </Box>
+            </Box>
+          </ChatHeaderBar>
+        ) : (
+          <ChatHeaderBar className="chat-header-bar">
+            <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+              Select a conversation
+            </Typography>
+          </ChatHeaderBar>
+        )}
+
+        {/* Messages Container */}
+        <MessageContainer className="message-container" ref={chatContainerRef}>
+          {selectedUser ? (
+            isLoading ? (
+              <PlaceholderText>Loading messages...</PlaceholderText>
+            ) : chatMessages.length > 0 ? (
+              chatMessages.map((msg, index) => {
+                const showGroupHeader =
+                  index === 0 ||
+                  chatMessages[index - 1].senderId !== msg.senderId;
+
+                return (
+                  <MessageGroup className="message-group" key={index}>
+                    <MessageWrapper isSelf={msg.isSelf}>
+                      {!msg.isSelf && showGroupHeader ? (
+                        <SenderAvatar>
+                          <Avatar
+                            alt={msg.senderName}
+                            src=""
+                            sx={{ width: 32, height: 32 }}
+                          />
+                        </SenderAvatar>
+                      ) : (
+                        <Box sx={{ width: '3vw' }} />
+                      )}
+                      {!msg.isSelf && showGroupHeader ? (
+                        <Box className="message-sender-info">
+                          <CurrentSenderName>
+                            {msg.senderName}
+                          </CurrentSenderName>
+                          <MessageBubble isSelf={msg.isSelf}>
+                            <MessageContent>{msg.message}</MessageContent>
+                          </MessageBubble>
+                        </Box>
+                      ) : (
+                        <MessageBubble isSelf={msg.isSelf}>
+                          <MessageContent>{msg.message}</MessageContent>
+                        </MessageBubble>
+                      )}
+                    </MessageWrapper>
+                  </MessageGroup>
+                );
+              })
+            ) : (
+              <PlaceholderText>
+                Start your conversation with {selectedUserName}
+              </PlaceholderText>
+            )
+          ) : (
+            <PlaceholderText>Select a user to start chatting</PlaceholderText>
+          )}
+        </MessageContainer>
+
+        {/* Input Area */}
+        <InputDiv className="current-chat-input-field">
+          <TextField
+            className="text-field"
+            fullWidth
+            placeholder={
+              selectedUser ? 'Type your message...' : 'Select a user first'
+            }
+            value={messageInputValue}
+            onChange={(e) => setMessageInputValue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            disabled={!selectedUser}
+            variant="outlined"
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                color: 'rgba(255, 255, 255, 0.8)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: 2,
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'rgba(0, 123, 255, 0.5)',
+                },
+              },
+              '& .MuiOutlinedInput-input::placeholder': {
+                color: 'rgba(255, 255, 255, 0.4)',
+                opacity: 1,
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment className="input-button-div" position="end">
+                  <IconButton
+                    onClick={sendMessage}
+                    disabled={!selectedUser || !messageInputValue.trim()}
+                    edge="end"
+                    sx={{
+                      color: messageInputValue.trim()
+                        ? 'rgba(0, 123, 255, 0.8)'
+                        : 'rgba(255, 255, 255, 0.3)',
+                    }}
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </InputDiv>
+      </ChatAreaContainer>
+    </MainContainer>
   );
 };
 
