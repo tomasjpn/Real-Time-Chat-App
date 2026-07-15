@@ -2,24 +2,33 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-console.log('Environment variables loaded:', {
-  SERVER_PORT: process.env.SERVER_PORT,
-  SERVER_HOST: process.env.SERVER_HOST,
-  SERVER_USER: process.env.SERVER_USER,
-  SERVER_PASSWORD: process.env.SERVER_PASSWORD,
-  SERVER_DATABASE: process.env.SERVER_DATABASE,
-  PASSWORD_TYPE: typeof process.env.SERVER_PASSWORD,
-});
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
 
 export const CONFIG = {
-  server: {
-    port: process.env.SERVER_PORT,
-    host: process.env.SERVER_HOST,
-    user: process.env.SERVER_USER,
-    password: process.env.SERVER_PASSWORD,
-    database: process.env.SERVER_DATABASE,
+  app: {
+    // 0.0.0.0 is required so the server is reachable from other devices on
+    // the local network, not just from localhost.
+    host: process.env.APP_HOST || '0.0.0.0',
+    port: Number(process.env.APP_PORT) || 3000,
   },
   db: {
-    connectionString: process.env.DATABASE_URL_CONNECTION_STRING,
+    host: requireEnv('DB_HOST'),
+    port: Number(process.env.DB_PORT) || 5432,
+    user: requireEnv('DB_USER'),
+    password: requireEnv('DB_PASSWORD'),
+    database: requireEnv('DB_NAME'),
+    connectionString: requireEnv('DATABASE_URL_CONNECTION_STRING'),
   },
+  corsOrigins: (
+    process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:4173'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 };

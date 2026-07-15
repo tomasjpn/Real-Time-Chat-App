@@ -9,11 +9,11 @@ const { Pool } = pkg;
 
 // Create a PostgreSQL connection pool
 export const pool = new Pool({
-  host: CONFIG.server.host,
-  port: Number(CONFIG.server.port),
-  user: CONFIG.server.user,
-  password: CONFIG.server.password,
-  database: CONFIG.server.database,
+  host: CONFIG.db.host,
+  port: CONFIG.db.port,
+  user: CONFIG.db.user,
+  password: CONFIG.db.password,
+  database: CONFIG.db.database,
 });
 
 export const db = drizzle(pool, { schema });

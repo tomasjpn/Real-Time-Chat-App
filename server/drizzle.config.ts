@@ -6,11 +6,11 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    host: process.env.SERVER_HOST || 'localhost',
-    port: Number(process.env.SERVER_PORT) || 5432,
-    user: process.env.SERVER_USER || 'postgres',
-    password: process.env.SERVER_PASSWORD || '',
-    database: process.env.SERVER_DATABASE || 'real-time-chat-app',
+    host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'real-time-chat-app',
     ssl: false,
   },
 });

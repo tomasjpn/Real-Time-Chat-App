@@ -14,22 +14,19 @@
   "description": "",
   "dependencies": {
     "@fastify/cors": "^10.0.1",
-    "@fastify/postgres": "^6.0.2",
-    "@fastify/websocket": "^11.0.1",
     "@types/node": "^22.9.0",
     "@types/pg": "^8.11.11",
-    "cors": "^2.8.5",
     "drizzle-orm": "^0.39.3",
+    "dotenv": "^16.5.0",
     "fastify": "^5.1.0",
-    "fastify-cors": "^6.0.3",
     "pg": "^8.13.3",
     "socket.io": "^4.8.1",
-    "typescript": "^5.6.3"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/socket.io": "^3.0.1",
     "drizzle-kit": "^0.31.4",
-    "tsx": "^4.7.0"
+    "tsx": "^4.7.0",
+    "typescript": "^5.6.3"
   },
   "drizzle-kit": {
     "schema": "./schema.ts",

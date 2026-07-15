@@ -1,6 +1,7 @@
 import Avatar from '@mui/material/Avatar';
 import { useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
+import { SERVER_URL } from '../config.ts';
 import {
   Box,
   Paper,
@@ -66,7 +67,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const socket = io('http://localhost:3000', {
+    const socket = io(SERVER_URL, {
       reconnection: false,
     });
 
