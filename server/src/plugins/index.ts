@@ -22,17 +22,4 @@ export async function registerPlugins(server: FastifyInstance) {
     credentials: true,
   });
   server.log.info('CORS plugin registered with origin http://localhost:5173.');
-
-  // Socket.IO - Initialize after server is ready
-  server.ready((err) => {
-    if (err) throw err;
-
-    const io = createSocketIOServer({
-      httpServer: server.server,
-      logger: server.log,
-      corsOrigins: ['http://localhost:5173', 'http://localhost:4173'],
-    });
-
-    initializeSocketIO(server, io);
-  });
 }
