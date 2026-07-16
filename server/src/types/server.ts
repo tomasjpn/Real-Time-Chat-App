@@ -1,3 +1,13 @@
+import type { Server, Socket } from 'socket.io';
+import type { ClientToServerEvents, ServerToClientEvents } from '@chat/shared';
+
+/** Socket.IO server/socket bound to the shared event contract. */
+export type TypedSocketServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents
+>;
+export type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+
 export type ConnectedUser = {
   socketId: string;
   userName: string;
@@ -17,21 +27,4 @@ export type socketToUuidMap = Record<string, string>;
 export type ChatroomRecord = {
   id: number;
   name: string;
-};
-
-export type privateMessagePayload = {
-  targetId: string;
-  message: string;
-};
-
-export type fetchedChatHistoryPayload = {
-  targetId: string;
-};
-
-export type ChatHistoryMessages = {
-  senderId: string;
-  senderName: string;
-  message: string;
-  timestamp: Date;
-  isSelf: boolean;
 };

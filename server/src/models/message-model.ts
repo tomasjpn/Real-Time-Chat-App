@@ -1,14 +1,7 @@
 import { db } from '../../db/config/db.js';
 import { asc, eq } from 'drizzle-orm';
+import { ChatMessageDTO } from '@chat/shared';
 import { messages, users } from '../../db/schema.js';
-
-export interface MessageWithSender {
-  senderId: string;
-  senderName: string;
-  message: string;
-  timestamp: Date;
-  isSelf?: boolean;
-}
 
 export async function saveMessageToDb(
   chatroomId: number,
@@ -25,7 +18,7 @@ export async function saveMessageToDb(
 export async function getChatHistoryFromDb(
   chatroomId: number,
   currentUserUuid: string
-): Promise<MessageWithSender[]> {
+): Promise<ChatMessageDTO[]> {
   const getMessagesResult = await db
     .select({
       id: messages.id,

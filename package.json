@@ -3,15 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "server"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run build:shared && tsc -b && vite build",
+    "build:shared": "npm run build --workspace @chat/shared",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "cd server && npm run dev",
+    "server": "npm run dev --workspace server",
     "start": "concurrently \"npm run dev\" \"npm run server\""
   },
   "dependencies": {
+    "@chat/shared": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@fontsource/roboto": "^5.1.1",

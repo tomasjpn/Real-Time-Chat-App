@@ -39,15 +39,13 @@ import {
   RECEIVE_PRIVATE_MESSAGE,
   SELF_ID,
   USER_LIST,
-} from '../../server/src/socket-events/socket-events.js';
-
-interface Message {
-  senderId: string;
-  senderName: string;
-  message: string;
-  isSelf: boolean;
-  timestamp?: string;
-}
+  type ChatHistoryPayload,
+  type ChatMessageDTO,
+  type ClientToServerEvents,
+  type PrivateMessageReceivedPayload,
+  type ServerToClientEvents,
+  type UserListPayload,
+} from '@chat/shared';
 
 interface CurrentChatProps {
   userName: string;
@@ -61,15 +59,21 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   );
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selfId, setSelfId] = useState<string>('');
-  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessageDTO[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<Socket<
+    ServerToClientEvents,
+    ClientToServerEvents
+  > | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const socket = io(SERVER_URL, {
-      reconnection: false,
-    });
+    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
+      SERVER_URL,
+      {
+        reconnection: false,
+      }
+    );
 
     socketRef.current = socket;
 
@@ -89,14 +93,14 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       setSelfId(id);
     });
 
-    socket.on(USER_LIST, (users: Record<string, string>) => {
+    socket.on(USER_LIST, (users: UserListPayload) => {
       console.log('Received user list:', users);
       setConnectedUsers(users);
     });
 
     socket.on(
       RECEIVE_PRIVATE_MESSAGE,
-      (data: { senderId: string; senderName: string; message: string }) => {
+      (data: PrivateMessageReceivedPayload) => {
         console.log('Received private message:', data);
         if (data.senderId === selectedUser || !selectedUser) {
           setChatMessages((prev) => [
@@ -110,7 +114,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       }
     );
 
-    socket.on(CHAT_HISTORY, (data: { messages: Message[]; error?: string }) => {
+    socket.on(CHAT_HISTORY, (data: ChatHistoryPayload) => {
       console.log('Received chat history:', data);
       if (data.error) {
         console.error('Error fetching chat history:', data.error);

@@ -1,7 +1,8 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
-import { FastifyBaseLogger } from 'fastify';
+import { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { initializeSocketControllers } from '../controllers/socket-controller.js';
+import { TypedSocketServer } from '../types/server.js';
 
 export interface SocketIODependencies {
   httpServer: HTTPServer;
@@ -11,10 +12,10 @@ export interface SocketIODependencies {
 
 export function createSocketIOServer(
   deps: SocketIODependencies
-): SocketIOServer {
+): TypedSocketServer {
   const { httpServer, logger, corsOrigins } = deps;
 
-  const io = new SocketIOServer(httpServer, {
+  const io: TypedSocketServer = new SocketIOServer(httpServer, {
     cors: {
       origin: corsOrigins,
       methods: ['GET', 'POST'],
@@ -27,12 +28,10 @@ export function createSocketIOServer(
 }
 
 export function initializeSocketIO(
-  server: import('fastify').FastifyInstance,
-  io: SocketIOServer
+  server: FastifyInstance,
+  io: TypedSocketServer
 ): void {
-  // Attach io to server for backward compatibility
   server.io = io;
 
-  // Initialize socket controllers
   initializeSocketControllers(server);
 }

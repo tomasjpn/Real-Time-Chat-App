@@ -1,29 +1,46 @@
-import { Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
-import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
+import {
+  connectedUsersMap,
+  socketToUuidMap,
+  TypedSocket,
+} from '../types/server.js';
 import { getUserByName, createUser } from '../models/user-model.js';
 import { createChatroom, addUserToChatroom } from '../models/index.js';
 import {
   NEW_USER,
   SELF_ID,
   USER_LIST,
-} from '../socket-events/socket-events.js';
+  INVALID_USERNAME,
+  userNameSchema,
+} from '@chat/shared';
 
 export function registerUserHandlers(
-  socket: Socket,
+  socket: TypedSocket,
   server: FastifyInstance,
   connectedUsers: connectedUsersMap,
   socketToUuid: socketToUuidMap
 ): void {
-  socket.on(NEW_USER, async (userName: string) => {
+  socket.on(NEW_USER, async (rawUserName: string) => {
     try {
+      const parsed = userNameSchema.safeParse(rawUserName);
+      if (!parsed.success) {
+        socket.emit(INVALID_USERNAME, 'Invalid username format');
+
+        server.log.warn(
+          { issues: parsed.error.issues },
+          'Rejected invalid username payload'
+        );
+        return;
+      }
+      const userName = parsed.data;
+
       let userUuid: string;
       let userId: number;
 
       const existingUser = await getUserByName(userName);
 
       if (existingUser) {
-        server.log.info('Existing user found:', existingUser);
+        server.log.info({ user: existingUser }, 'Existing user found');
         userUuid = existingUser.uuid;
         userId = existingUser.id;
       } else {

@@ -1,6 +1,9 @@
-import { Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
-import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
+import {
+  connectedUsersMap,
+  socketToUuidMap,
+  TypedSocket,
+} from '../types/server.js';
 import { getUserById } from '../models/user-model.js';
 import { getSharedChatroom, createSharedChatroom } from '../models/index.js';
 import { saveMessageToDb, getChatHistoryFromDb } from '../models/index.js';
@@ -9,17 +12,29 @@ import {
   FETCH_CHAT_HISTORY,
   PRIVATE_MESSAGE,
   RECEIVE_PRIVATE_MESSAGE,
-} from '../socket-events/socket-events.js';
+  fetchChatHistorySchema,
+  privateMessageSchema,
+} from '@chat/shared';
 
 export function registerMessageHandlers(
-  socket: Socket,
+  socket: TypedSocket,
   server: FastifyInstance,
   connectedUsers: connectedUsersMap,
   socketToUuid: socketToUuidMap
 ): void {
   socket.on(
     PRIVATE_MESSAGE,
-    async ({ targetId, message }: { targetId: string; message: string }) => {
+    async (rawPayload: { targetId: string; message: string }) => {
+      const parsed = privateMessageSchema.safeParse(rawPayload);
+      if (!parsed.success) {
+        server.log.warn(
+          { issues: parsed.error.issues },
+          'Rejected invalid private-message payload'
+        );
+        return;
+      }
+      const { targetId, message } = parsed.data;
+
       // Get sender's UUID from socketId
       const senderUuid = socketToUuid[socket.id];
       if (!senderUuid || !connectedUsers[senderUuid]) {
@@ -33,7 +48,7 @@ export function registerMessageHandlers(
       );
 
       if (!connectedUsers[targetId]) {
-        server.log.warn('Target user not found:', targetId);
+        server.log.warn({ targetId }, 'Target user not found');
         return;
       }
 
@@ -84,7 +99,17 @@ export function registerMessageHandlers(
     }
   );
 
-  socket.on(FETCH_CHAT_HISTORY, async ({ targetId }: { targetId: string }) => {
+  socket.on(FETCH_CHAT_HISTORY, async (rawPayload: { targetId: string }) => {
+    const parsed = fetchChatHistorySchema.safeParse(rawPayload);
+    if (!parsed.success) {
+      server.log.warn(
+        { issues: parsed.error.issues },
+        'Rejected invalid fetch-chat-history payload'
+      );
+      return;
+    }
+    const { targetId } = parsed.data;
+
     const senderUuid = socketToUuid[socket.id];
     if (!senderUuid || !connectedUsers[senderUuid]) {
       server.log.warn('Unknown sender, cannot fetch chat history');
@@ -121,7 +146,7 @@ export function registerMessageHandlers(
 
       socket.emit(CHAT_HISTORY, { messages });
     } catch (error) {
-      server.log.error('Error fetching chat history:', error);
+      server.log.error({ err: error }, 'Error fetching chat history');
       socket.emit(CHAT_HISTORY, {
         error: 'Failed to fetch chat history',
         messages: [],

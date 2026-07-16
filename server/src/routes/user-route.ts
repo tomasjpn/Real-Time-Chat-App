@@ -8,7 +8,7 @@ export async function userRoutes(server: FastifyInstance) {
       const users = await db.execute(sql`SELECT * FROM users`);
       return users;
     } catch (error) {
-      server.log.error('Error fetching users:', error);
+      server.log.error({ err: error }, 'Error fetching users');
       return { error: 'Failed to fetch users' };
     }
   });

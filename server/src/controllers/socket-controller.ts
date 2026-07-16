@@ -1,13 +1,12 @@
-import { Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
-import { connectedUsersMap, socketToUuidMap } from '../types/server.js';
+import {
+  connectedUsersMap,
+  socketToUuidMap,
+  TypedSocket,
+} from '../types/server.js';
 import { registerUserHandlers } from './user-controller.js';
 import { registerMessageHandlers } from './message-controller.js';
-import {
-  SERVER_DISCONNECT,
-  SERVER_CONNECTION,
-  USER_LIST,
-} from '../socket-events/socket-events.js';
+import { SERVER_DISCONNECT, SERVER_CONNECTION, USER_LIST } from '@chat/shared';
 
 // Central store for connected users
 export const connectedUsers: connectedUsersMap = {};
@@ -23,15 +22,15 @@ export function initializeSocketControllers(server: FastifyInstance): void {
    * socket.on => no real-time Websocket connection from Socket.IO rather just fastify own events
    */
 
-  server.io.on(SERVER_CONNECTION, (socket: Socket) => {
-    server.log.info('A user connected:', socket.id);
+  server.io.on(SERVER_CONNECTION, (socket: TypedSocket) => {
+    server.log.info({ socketId: socket.id }, 'A user connected');
 
     registerUserHandlers(socket, server, connectedUsers, socketToUuid);
     registerMessageHandlers(socket, server, connectedUsers, socketToUuid);
 
     // Handle socket disconnection
     socket.on(SERVER_DISCONNECT, () => {
-      server.log.info('User disconnected:', socket.id);
+      server.log.info({ socketId: socket.id }, 'User disconnected');
 
       // Find and remove user by socket ID
       const userUuid = socketToUuid[socket.id];

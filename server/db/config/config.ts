@@ -1,34 +1,53 @@
 import dotenv from 'dotenv';
+import { z } from 'zod';
 
 dotenv.config();
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
+const envSchema = z.object({
+  // App server (Fastify). 0.0.0.0 is required so the server is reachable
+  // from other devices on the local network, not just from localhost.
+  APP_HOST: z.string().default('0.0.0.0'),
+  APP_PORT: z.coerce.number().int().positive().default(3000),
+
+  // Database
+  DB_HOST: z.string().min(1),
+  DB_PORT: z.coerce.number().int().positive().default(5432),
+  DB_USER: z.string().min(1),
+  DB_PASSWORD: z.string().min(1),
+  DB_NAME: z.string().min(1),
+  DATABASE_URL_CONNECTION_STRING: z.string().url(),
+
+  // Comma-separated list of allowed browser origins (CORS + Socket.IO)
+  CORS_ORIGINS: z
+    .string()
+    .default('http://localhost:5173,http://localhost:4173'),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  const issues = parsed.error.issues
+    .map((issue) => `  ${issue.path.join('.')}: ${issue.message}`)
+    .join('\n');
+  throw new Error(`Invalid environment configuration:\n${issues}`);
 }
+
+const env = parsed.data;
 
 export const CONFIG = {
   app: {
-    // 0.0.0.0 is required so the server is reachable from other devices on
-    // the local network, not just from localhost.
-    host: process.env.APP_HOST || '0.0.0.0',
-    port: Number(process.env.APP_PORT) || 3000,
+    host: env.APP_HOST,
+    port: env.APP_PORT,
   },
   db: {
-    host: requireEnv('DB_HOST'),
-    port: Number(process.env.DB_PORT) || 5432,
-    user: requireEnv('DB_USER'),
-    password: requireEnv('DB_PASSWORD'),
-    database: requireEnv('DB_NAME'),
-    connectionString: requireEnv('DATABASE_URL_CONNECTION_STRING'),
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    database: env.DB_NAME,
+    connectionString: env.DATABASE_URL_CONNECTION_STRING,
   },
-  corsOrigins: (
-    process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:4173'
-  )
-    .split(',')
+  corsOrigins: env.CORS_ORIGINS.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
 };
