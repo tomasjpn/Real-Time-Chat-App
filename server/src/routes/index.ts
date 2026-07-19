@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { userRoutes } from './user-route.js';
+import { authRoutes } from './auth-route.js';
 import chatRoutes from './chat-route.js';
 
 export async function initializeRoutes(server: FastifyInstance) {
@@ -8,6 +9,15 @@ export async function initializeRoutes(server: FastifyInstance) {
   server.get('/', async () => {
     return { message: 'Chat server is running' };
   });
+
+  try {
+    server.log.info('Registering auth routes');
+    await server.register(authRoutes);
+    server.log.info('Auth routes registered successfully');
+  } catch (error) {
+    server.log.error({ err: error }, 'Failed to register auth routes');
+    throw error;
+  }
 
   try {
     server.log.info('Registering user routes');

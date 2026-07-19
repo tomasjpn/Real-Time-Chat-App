@@ -20,7 +20,12 @@ const envSchema = z.object({
   // Comma-separated list of allowed browser origins (CORS + Socket.IO)
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:5173,http://localhost:4173'),
+    .default(
+      'http://localhost:5173,http://localhost:4173,http://localhost:5174,http://192.168.178.79:5174'
+    ),
+
+  // Auth
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -50,4 +55,12 @@ export const CONFIG = {
   corsOrigins: env.CORS_ORIGINS.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  auth: {
+    jwtSecret: env.JWT_SECRET,
+    accessTokenTtl: '15m',
+    refreshTokenTtlMs: 30 * 24 * 60 * 60 * 1000, // 30 days
+    refreshCookieName: 'refresh_token',
+    // Cookie is scoped to the auth routes so it is not sent on every request
+    refreshCookiePath: '/auth',
+  },
 };

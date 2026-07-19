@@ -1,46 +1,59 @@
 import { db } from '../../db/config/db.js';
 import { eq } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 import { UserRecord } from '../types/server.js';
 import { users } from '../../db/schema.js';
 
-export async function getUserByName(
-  userName: string
-): Promise<UserRecord | null> {
+const publicUserColumns = {
+  id: users.id,
+  username: users.username,
+  displayName: users.displayName,
+};
+
+/** Includes the password hash — only for credential verification. */
+export async function getUserWithPasswordByUsername(
+  username: string
+): Promise<(UserRecord & { passwordHash: string }) | null> {
   const [result] = await db
-    .select({
-      id: users.id,
-      uuid: users.uuid,
-      name: users.name,
-    })
+    .select({ ...publicUserColumns, passwordHash: users.passwordHash })
     .from(users)
-    .where(eq(users.name, userName))
+    .where(eq(users.username, username))
     .limit(1);
 
   return result ?? null;
 }
 
-export async function createUser(userName: string): Promise<UserRecord> {
-  const userUuid = uuidv4();
-
-  const [insertedUserResult] = await db
-    .insert(users)
-    .values({ uuid: userUuid, name: userName })
-    .returning({ id: users.id, uuid: users.uuid, name: users.name });
-
-  return insertedUserResult;
-}
-
-export async function getUserById(uuid: string): Promise<UserRecord | null> {
-  const [getUserResult] = await db
-    .select({
-      id: users.id,
-      uuid: users.uuid,
-      name: users.name,
-    })
+export async function getUserByUsername(
+  username: string
+): Promise<UserRecord | null> {
+  const [result] = await db
+    .select(publicUserColumns)
     .from(users)
-    .where(eq(users.uuid, uuid))
+    .where(eq(users.username, username))
     .limit(1);
 
-  return getUserResult ?? null;
+  return result ?? null;
+}
+
+export async function getUserById(id: string): Promise<UserRecord | null> {
+  const [result] = await db
+    .select(publicUserColumns)
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+
+  return result ?? null;
+}
+
+/** Throws the underlying Postgres error (code 23505) on username conflict. */
+export async function createUser(
+  username: string,
+  displayName: string,
+  passwordHash: string
+): Promise<UserRecord> {
+  const [inserted] = await db
+    .insert(users)
+    .values({ username, displayName, passwordHash })
+    .returning(publicUserColumns);
+
+  return inserted;
 }

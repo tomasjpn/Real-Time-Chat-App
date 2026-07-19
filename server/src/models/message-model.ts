@@ -5,7 +5,7 @@ import { messages, users } from '../../db/schema.js';
 
 export async function saveMessageToDb(
   chatroomId: number,
-  userId: number,
+  userId: string,
   content: string
 ): Promise<void> {
   await db.insert(messages).values({
@@ -17,16 +17,14 @@ export async function saveMessageToDb(
 
 export async function getChatHistoryFromDb(
   chatroomId: number,
-  currentUserUuid: string
+  currentUserId: string
 ): Promise<ChatMessageDTO[]> {
   const getMessagesResult = await db
     .select({
-      id: messages.id,
-      userId: messages.userId,
+      senderId: users.id,
+      senderName: users.displayName,
       content: messages.content,
       createdAt: messages.createdAt,
-      senderName: users.name,
-      senderUuid: users.uuid,
     })
     .from(messages)
     .innerJoin(users, eq(messages.userId, users.id))
@@ -34,15 +32,10 @@ export async function getChatHistoryFromDb(
     .orderBy(asc(messages.createdAt));
 
   return getMessagesResult.map((msg) => ({
-    senderId: String(msg.senderUuid),
-    senderName: String(msg.senderName),
-    message: String(msg.content),
-    timestamp:
-      msg.createdAt instanceof Date
-        ? msg.createdAt
-        : typeof msg.createdAt === 'string' || typeof msg.createdAt === 'number'
-          ? new Date(msg.createdAt)
-          : new Date(),
-    isSelf: String(msg.senderUuid) === currentUserUuid,
+    senderId: msg.senderId,
+    senderName: msg.senderName,
+    message: msg.content,
+    timestamp: msg.createdAt,
+    isSelf: msg.senderId === currentUserId,
   }));
 }

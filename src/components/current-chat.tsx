@@ -11,6 +11,7 @@ import {
   InputAdornment,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import LogoutIcon from '@mui/icons-material/Logout';
 import {
   ChatAreaContainer,
   ChatHeaderBar,
@@ -31,34 +32,36 @@ import {
 
 import {
   CHAT_HISTORY,
-  CLIENT_CONNECTION,
   CONNECT_ERROR,
   FETCH_CHAT_HISTORY,
-  NEW_USER,
   PRIVATE_MESSAGE,
   RECEIVE_PRIVATE_MESSAGE,
-  SELF_ID,
   USER_LIST,
   type ChatHistoryPayload,
   type ChatMessageDTO,
   type ClientToServerEvents,
   type PrivateMessageReceivedPayload,
   type ServerToClientEvents,
+  type UserDTO,
   type UserListPayload,
 } from '@chat/shared';
+import { useAuth } from '../auth/auth-context.tsx';
 
 interface CurrentChatProps {
-  userName: string;
+  user: UserDTO;
 }
 
-const CurrentChat = ({ userName }: CurrentChatProps) => {
+const CurrentChat = ({ user }: CurrentChatProps) => {
+  const { accessToken, logout } = useAuth();
+  // Identity comes from the authenticated session
+  const userName = user.displayName;
+  const selfId = user.id;
   const [messageInputValue, setMessageInputValue] = useState('');
   const [connectionError, setConnectionError] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState<Record<string, string>>(
     {}
   );
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [selfId, setSelfId] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<ChatMessageDTO[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const socketRef = useRef<Socket<
@@ -68,10 +71,15 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!accessToken) return;
+
+    // Identity travels in the handshake; the server rejects the
+    // connection entirely if the token is missing or invalid.
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
       SERVER_URL,
       {
         reconnection: false,
+        auth: { token: accessToken },
       }
     );
 
@@ -81,16 +89,6 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
       console.error('Connection error:', error);
       setConnectionError(true);
       socket.disconnect();
-    });
-
-    socket.on(CLIENT_CONNECTION, () => {
-      console.log('Connected to server');
-      socket.emit(NEW_USER, userName);
-    });
-
-    socket.on(SELF_ID, (id: string) => {
-      console.log('Received self ID:', id);
-      setSelfId(id);
     });
 
     socket.on(USER_LIST, (users: UserListPayload) => {
@@ -127,7 +125,7 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
     return () => {
       socket.disconnect();
     };
-  }, [userName]);
+  }, [accessToken]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -183,7 +181,8 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
           color: 'rgba(255, 255, 255, 0.7)',
         }}
       >
-        Cannot connect. Chat room is full. Please try again later.
+        Cannot connect to the chat server. Your session may have expired —
+        try reloading the page.
       </Box>
     );
   }
@@ -232,6 +231,14 @@ const CurrentChat = ({ userName }: CurrentChatProps) => {
                 {userName}
               </Typography>
             </Box>
+            <IconButton
+              onClick={() => logout()}
+              size="small"
+              title="Log out"
+              sx={{ color: 'rgba(255, 255, 255, 0.5)' }}
+            >
+              <LogoutIcon fontSize="small" />
+            </IconButton>
           </Box>
         </Paper>
 

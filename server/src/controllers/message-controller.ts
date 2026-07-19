@@ -1,9 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import {
-  connectedUsersMap,
-  socketToUuidMap,
-  TypedSocket,
-} from '../types/server.js';
+import { connectedUsersMap, TypedSocket } from '../types/server.js';
 import { getUserById } from '../models/user-model.js';
 import { getSharedChatroom, createSharedChatroom } from '../models/index.js';
 import { saveMessageToDb, getChatHistoryFromDb } from '../models/index.js';
@@ -19,8 +15,7 @@ import {
 export function registerMessageHandlers(
   socket: TypedSocket,
   server: FastifyInstance,
-  connectedUsers: connectedUsersMap,
-  socketToUuid: socketToUuidMap
+  connectedUsers: connectedUsersMap
 ): void {
   socket.on(
     PRIVATE_MESSAGE,
@@ -35,65 +30,46 @@ export function registerMessageHandlers(
       }
       const { targetId, message } = parsed.data;
 
-      // Get sender's UUID from socketId
-      const senderUuid = socketToUuid[socket.id];
-      if (!senderUuid || !connectedUsers[senderUuid]) {
-        server.log.warn('Unknown sender, message discarded');
-        return;
-      }
+      // Identity comes from the authenticated handshake, never the payload
+      const senderId = socket.data.userId;
+      const senderName = socket.data.displayName;
 
-      const senderName = connectedUsers[senderUuid].userName;
       server.log.info(
-        `Private message from ${senderName} (${senderUuid}) to ${targetId}: ${message}`
+        { senderId, targetId },
+        'Private message'
       );
 
       if (!connectedUsers[targetId]) {
-        server.log.warn({ targetId }, 'Target user not found');
+        server.log.warn({ targetId }, 'Target user not connected');
         return;
       }
 
       const targetSocketId = connectedUsers[targetId].socketId;
 
       try {
-        const userId = connectedUsers[senderUuid].dbUserId;
-        const targetUserId = connectedUsers[targetId].dbUserId;
-        let chatroomId;
-
-        if (!userId || !targetUserId) {
-          server.log.warn(
-            'User ID not found in memory, sending message without saving to DB'
-          );
-          server.io.to(targetSocketId).emit(RECEIVE_PRIVATE_MESSAGE, {
-            senderId: senderUuid,
-            senderName: senderName,
-            message: message,
-          });
-          return;
-        }
-
-        chatroomId = await getSharedChatroom(userId, targetUserId);
+        let chatroomId = await getSharedChatroom(senderId, targetId);
 
         if (!chatroomId) {
           chatroomId = await createSharedChatroom(
-            userId,
-            targetUserId,
-            `room_${senderUuid}_${targetId}`
+            senderId,
+            targetId,
+            `room_${senderId}_${targetId}`
           );
         }
 
-        await saveMessageToDb(chatroomId, userId, message);
+        await saveMessageToDb(chatroomId, senderId, message);
 
         server.io.to(targetSocketId).emit(RECEIVE_PRIVATE_MESSAGE, {
-          senderId: senderUuid,
-          senderName: senderName,
-          message: message,
+          senderId,
+          senderName,
+          message,
         });
       } catch (error) {
-        console.error('Error sending private message:', error);
+        server.log.error({ err: error }, 'Error sending private message');
         server.io.to(targetSocketId).emit(RECEIVE_PRIVATE_MESSAGE, {
-          senderId: senderUuid,
-          senderName: senderName,
-          message: message,
+          senderId,
+          senderName,
+          message,
         });
       }
     }
@@ -109,40 +85,28 @@ export function registerMessageHandlers(
       return;
     }
     const { targetId } = parsed.data;
-
-    const senderUuid = socketToUuid[socket.id];
-    if (!senderUuid || !connectedUsers[senderUuid]) {
-      server.log.warn('Unknown sender, cannot fetch chat history');
-      return;
-    }
+    const senderId = socket.data.userId;
 
     try {
-      const currentUser = await getUserById(senderUuid);
       const targetUser = await getUserById(targetId);
-
-      if (!currentUser || !targetUser) {
+      if (!targetUser) {
         socket.emit(CHAT_HISTORY, {
-          error: 'One or both users not found',
+          error: 'User not found',
           messages: [],
         });
         return;
       }
 
-      let chatroomId = await getSharedChatroom(currentUser.id, targetUser.id);
+      const chatroomId = await getSharedChatroom(senderId, targetId);
 
       if (!chatroomId) {
-        chatroomId = await createSharedChatroom(
-          currentUser.id,
-          targetUser.id,
-          `room_${senderUuid}_${targetId}`
-        );
-
-        // No messages yet in a new chatroom
+        // No conversation yet — history is simply empty; the room is
+        // created lazily when the first message is sent.
         socket.emit(CHAT_HISTORY, { messages: [] });
         return;
       }
 
-      const messages = await getChatHistoryFromDb(chatroomId, senderUuid);
+      const messages = await getChatHistoryFromDb(chatroomId, senderId);
 
       socket.emit(CHAT_HISTORY, { messages });
     } catch (error) {

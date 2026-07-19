@@ -4,6 +4,28 @@
  * compile error on both sides instead of a silent runtime mismatch.
  */
 
+export interface UserDTO {
+  id: string;
+  username: string;
+  displayName: string;
+}
+
+/** Response of register/login/refresh. The refresh token itself travels
+ *  only in an httpOnly cookie and never appears in a response body. */
+export interface AuthSuccessDTO {
+  user: UserDTO;
+  accessToken: string;
+}
+
+export interface ApiErrorDTO {
+  error: string;
+}
+
+export interface UsernameAvailabilityDTO {
+  available: boolean;
+  reason?: string;
+}
+
 export interface ChatMessageDTO {
   senderId: string;
   senderName: string;
@@ -24,5 +46,5 @@ export interface ChatHistoryPayload {
   error?: string;
 }
 
-/** Map of connected users: uuid -> display name. */
+/** Map of connected users: user id -> display name. */
 export type UserListPayload = Record<string, string>;

@@ -14,15 +14,15 @@ export async function createChatroom(name: string): Promise<ChatroomRecord> {
 }
 
 export async function addUserToChatroom(
-  userId: number,
+  userId: string,
   chatroomId: number
 ): Promise<void> {
   await db.insert(userChatrooms).values({ userId, chatroomId });
 }
 
 export async function getSharedChatroom(
-  userId1: number,
-  userId2: number
+  userId1: string,
+  userId2: string
 ): Promise<number | null> {
   const uc2 = alias(userChatrooms, 'uc2');
 
@@ -42,8 +42,8 @@ export async function getSharedChatroom(
 }
 
 export async function createSharedChatroom(
-  userId1: number,
-  userId2: number,
+  userId1: string,
+  userId2: string,
   chatroomName: string
 ): Promise<number> {
   const [newChatroomResult] = await db
